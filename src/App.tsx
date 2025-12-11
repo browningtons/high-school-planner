@@ -357,7 +357,7 @@ const App: React.FC = () => {
              {/* Logo Placeholder */}
             <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
                <img 
-                  src="/tiger-logo.png" 
+                  src="tiger-logo.png" 
                   alt="Ogden Tiger" 
                   className="w-full h-full object-cover p-1 bg-white"
                   onError={(e) => {
