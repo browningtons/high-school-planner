@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, Info, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, HelpCircle, List, Globe, Mail, User } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
