@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, Info, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, TrendingUp, HelpCircle, List, Globe, Mail, Phone, User } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
@@ -158,7 +158,7 @@ const SKILL_PATHS: SkillPath[] = [
     schedule: {
       grade10: ['CS_1030', 'WEB_1400', 'AP_GEOGRAPHY'], // Eased in: Principles + Web 1 + Intro AP
       grade11: ['CS_1400', 'CE_MATH_1050', 'CE_CHEM_1010', 'CE_ENG_1010'], // Core + Programming
-      grade12: ['CS_1410', 'AP_CALC_AB', 'AP_PHYSICS', 'CE_ENG_2015'], // Advanced Tech + Math/Sci
+      grade12: ['CS_1410', 'AP_CALC_AB', 'AP_PHYSICS', 'CE_ENG_2015', 'CE_COMM_2110'], // Advanced Tech + Math/Sci
     },
     recommendedElectives: ['WEB_2350', 'ENGR_1000', 'CS_2420', 'CE_MUSIC', 'AUTO_1000'],
   },
@@ -184,7 +184,7 @@ const SKILL_PATHS: SkillPath[] = [
       grade11: ['BSAD_1010', 'STAT_1040', 'CE_ENG_1010', 'AP_US_HIST'], // Core + Bus Mgmt
       grade12: ['IB_ECON', 'CE_COMM_2110', 'CE_ENG_2015', 'AP_US_GOV'], // Advanced Econ + Comm
     },
-    recommendedElectives: ['AP_SPANISH', 'AP_MICRO', 'AP_DRAWING', 'AVID_12', 'EDUC_1010'],
+    recommendedElectives: ['AP_SPANISH', 'AP_US_GOV', 'AP_DRAWING', 'AP_MICRO', 'AVID_12', 'EDUC_1010'],
   },
   {
     id: 'social',
@@ -194,9 +194,9 @@ const SKILL_PATHS: SkillPath[] = [
     schedule: {
       grade10: ['AP_GEOGRAPHY', 'CE_CJ_1010', 'WEB_1700'], // Eased in: Intro AP + Intro CJ + Tech
       grade11: ['AP_US_HIST', 'STAT_1040', 'CE_ENG_1010', 'IB_ECON'], // Core + History
-      grade12: ['AP_US_GOV', 'AP_COMP_GOV', 'CE_ENG_2015', 'CE_COMM_2110'], // Advanced Gov + Politics
+      grade12: ['AP_US_GOV', 'AP_MICRO', 'CE_COMM_2110', 'AP_COMP_GOV'], // Advanced Gov + Politics
     },
-    recommendedElectives: ['IB_SPAN_SL', 'EDUC_1010', 'CE_MUSIC', 'AP_MICRO'],
+    recommendedElectives: ['AP_GEOGRAPHY', 'IB_SPAN_SL', 'EDUC_1010', 'CE_MUSIC', 'AP_MICRO'],
   },
 ];
 
@@ -244,7 +244,7 @@ const App: React.FC = () => {
   const getCourse = (id: string) => ALL_COURSES.find(c => c.id === id);
 
   // Computed data for the selected path
-  const { satisfiedCats, totalCredits, wsuResidencyCredits, remainingCats } = useMemo(() => {
+  const { pathCourses, satisfiedCats, totalCredits, wsuResidencyCredits, remainingCats } = useMemo(() => {
     const allIds = [
       ...selectedPath.schedule.grade10,
       ...selectedPath.schedule.grade11,
@@ -358,7 +358,7 @@ const App: React.FC = () => {
              {/* Logo Placeholder */}
             <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Generic_Tiger_Mascot.svg/1200px-Generic_Tiger_Mascot.svg.png" 
+                  src="/tiger-logo.png" 
                   alt="Ogden Tiger" 
                   className="w-full h-full object-cover p-1 bg-white"
                   onError={(e) => {
