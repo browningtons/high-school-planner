@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, Info, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, TrendingUp, HelpCircle, List, Globe, Mail, Phone, User } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
@@ -244,7 +244,7 @@ const App: React.FC = () => {
   const getCourse = (id: string) => ALL_COURSES.find(c => c.id === id);
 
   // Computed data for the selected path
-  const { pathCourses, satisfiedCats, totalCredits, wsuResidencyCredits, remainingCats } = useMemo(() => {
+  const { satisfiedCats, totalCredits, wsuResidencyCredits, remainingCats } = useMemo(() => {
     const allIds = [
       ...selectedPath.schedule.grade10,
       ...selectedPath.schedule.grade11,
@@ -272,7 +272,6 @@ const App: React.FC = () => {
     const remaining = REQUIRED_CATEGORIES.filter(cat => !satisfied.has(cat));
 
     return { 
-      pathCourses: courses, 
       satisfiedCats: satisfied, 
       totalCredits: total, 
       wsuResidencyCredits: residency,
