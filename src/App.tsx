@@ -419,7 +419,7 @@ const App: React.FC = () => {
                <img 
                   src="tiger-logo.png" 
                   alt="Ogden Tiger" 
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-contain p-1 translate-y-[-2px]"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
