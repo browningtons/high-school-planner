@@ -415,7 +415,7 @@ const App: React.FC = () => {
           
           <div className="flex flex-col md:flex-row gap-6">
              {/* Logo Placeholder */}
-            <div className="hidden md:flex w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 items-center justify-center">
+            <div className="w-full h-full object-cover translate-y-[-2px]">
               <img 
                 src="tiger-logo.png" 
                 alt="Ogden Tiger" 
