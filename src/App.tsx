@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Calendar, Clock, FileText, Check } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
@@ -156,9 +156,9 @@ const SKILL_PATHS: SkillPath[] = [
     icon: Zap,
     description: 'Software, Engineering, Physics',
     schedule: {
-      grade10: ['CS_1030', 'WEB_1400', 'AP_GEOGRAPHY'], // Eased in: Principles + Web 1 + Intro AP
-      grade11: ['CS_1400', 'CE_MATH_1050', 'CE_CHEM_1010', 'CE_ENG_1010'], // Core + Programming
-      grade12: ['CS_1410', 'AP_CALC_AB', 'AP_PHYSICS', 'CE_ENG_2015', 'CE_COMM_2110'], // Advanced Tech + Math/Sci
+      grade10: ['CS_1030', 'WEB_1400', 'AP_GEOGRAPHY'], 
+      grade11: ['CS_1400', 'CE_MATH_1050', 'CE_CHEM_1010', 'CE_ENG_1010'], 
+      grade12: ['CS_1410', 'AP_CALC_AB', 'AP_PHYSICS', 'CE_ENG_2015', 'CE_COMM_2110'], 
     },
     recommendedElectives: ['WEB_2350', 'ENGR_1000', 'CS_2420', 'CE_MUSIC', 'AUTO_1000'],
   },
@@ -168,9 +168,9 @@ const SKILL_PATHS: SkillPath[] = [
     icon: Heart,
     description: 'Medical, Nursing, Biology',
     schedule: {
-      grade10: ['HTHS_1101', 'CE_NUTRITION', 'AP_GEOGRAPHY'], // Eased in: Terminology + Nutrition + Intro AP
-      grade11: ['HTHS_1104', 'CE_MATH_1035', 'CE_CHEM_1010', 'CE_ENG_1010'], // Core + Anatomy
-      grade12: ['AP_BIOLOGY', 'RHS_2300', 'CE_ENG_2015', 'AP_US_GOV'], // Advanced Bio + EMS
+      grade10: ['HTHS_1101', 'CE_NUTRITION', 'AP_GEOGRAPHY'],
+      grade11: ['HTHS_1104', 'CE_MATH_1035', 'CE_CHEM_1010', 'CE_ENG_1010'], 
+      grade12: ['AP_BIOLOGY', 'RHS_2300', 'CE_ENG_2015', 'AP_US_GOV'],
     },
     recommendedElectives: ['RHS_2175', 'STAT_1040', 'CE_CJ_1010', 'HTHS_2910'],
   },
@@ -180,9 +180,9 @@ const SKILL_PATHS: SkillPath[] = [
     icon: Briefcase,
     description: 'Business, Law, Liberal Arts',
     schedule: {
-      grade10: ['WEB_1700', 'ENTR_1000', 'AP_GEOGRAPHY'], // Eased in: Office Spec + Entrepreneurship
-      grade11: ['BSAD_1010', 'STAT_1040', 'CE_ENG_1010', 'AP_US_HIST'], // Core + Bus Mgmt
-      grade12: ['IB_ECON', 'CE_COMM_2110', 'CE_ENG_2015', 'AP_US_GOV'], // Advanced Econ + Comm
+      grade10: ['WEB_1700', 'ENTR_1000', 'AP_GEOGRAPHY'], 
+      grade11: ['BSAD_1010', 'STAT_1040', 'CE_ENG_1010', 'AP_US_HIST'],
+      grade12: ['IB_ECON', 'CE_COMM_2110', 'CE_ENG_2015', 'AP_US_GOV'],
     },
     recommendedElectives: ['AP_SPANISH', 'AP_US_GOV', 'AP_DRAWING', 'AP_MICRO', 'AVID_12', 'EDUC_1010'],
   },
@@ -192,9 +192,9 @@ const SKILL_PATHS: SkillPath[] = [
     icon: Globe,
     description: 'History, Government, Criminal Justice',
     schedule: {
-      grade10: ['AP_GEOGRAPHY', 'CE_CJ_1010', 'WEB_1700'], // Eased in: Intro AP + Intro CJ + Tech
-      grade11: ['AP_US_HIST', 'STAT_1040', 'CE_ENG_1010', 'IB_ECON'], // Core + History
-      grade12: ['AP_US_GOV', 'AP_MICRO', 'CE_COMM_2110', 'AP_COMP_GOV'], // Advanced Gov + Politics
+      grade10: ['AP_GEOGRAPHY', 'CE_CJ_1010', 'WEB_1700'], 
+      grade11: ['AP_US_HIST', 'STAT_1040', 'CE_ENG_1010', 'IB_ECON'],
+      grade12: ['AP_US_GOV', 'AP_MICRO', 'CE_COMM_2110', 'AP_COMP_GOV'], 
     },
     recommendedElectives: ['AP_GEOGRAPHY', 'IB_SPAN_SL', 'EDUC_1010', 'CE_MUSIC', 'AP_MICRO'],
   },
@@ -237,6 +237,66 @@ const App: React.FC = () => {
   const [selectedPathId, setSelectedPathId] = useState<SkillPath['id']>('tech');
   const [showFullCatalog, setShowFullCatalog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [email, setEmail] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  
+  // --- NEW: DOB State & Logic ---
+  const [childDob, setChildDob] = useState<string>(() => localStorage.getItem('child_dob') || '');
+  // State to track if we are in "edit mode" for the date. 
+  // If no date exists in storage, default to true.
+  const [isEditingDob, setIsEditingDob] = useState<boolean>(!localStorage.getItem('child_dob'));
+
+  useEffect(() => {
+    localStorage.setItem('child_dob', childDob);
+  }, [childDob]);
+
+  const gradStats = useMemo(() => {
+    if (!childDob) return null;
+    const dob = new Date(childDob);
+    if (isNaN(dob.getTime())) return null;
+
+    // Estimate graduation: typically May of the year they turn 18.
+    // Cutoff logic: If born Sep-Dec, usually graduate year they turn 19.
+    const month = dob.getMonth(); // 0-11
+    let gradYear = dob.getFullYear() + 18;
+    if (month >= 8) { // Born Sep or later
+        gradYear += 1;
+    }
+    
+    // 10th Grade Start calculation:
+    // Graduation is end of 12th.
+    // Start of 12th: gradYear - 1 (Sept)
+    // Start of 11th: gradYear - 2 (Sept)
+    // Start of 10th: gradYear - 3 (Sept)
+    const tenthGradeYear = gradYear - 3;
+
+    // Target date: September 1st
+    const targetDate = new Date(tenthGradeYear, 8, 1); // Month 8 is September
+    const today = new Date();
+    
+    // Calculate difference
+    const diff = targetDate.getTime() - today.getTime();
+    const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    
+    return { date: targetDate, days: Math.max(0, daysLeft), year: tenthGradeYear };
+  }, [childDob]);
+  // -----------------------------
+
+  const handleShare = (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!email) return;
+    setIsSending(true);
+    // Simulate API call
+    setTimeout(() => {
+        alert(`PDF Plan sent to ${email}!`);
+        setIsSending(false);
+        setEmail('');
+    }, 1500);
+  };
+
+  const handleSaveDob = () => {
+    setIsEditingDob(false);
+  };
 
   const selectedPath = useMemo(() => SKILL_PATHS.find(p => p.id === selectedPathId)!, [selectedPathId]);
 
@@ -353,13 +413,13 @@ const App: React.FC = () => {
       <div className="bg-slate-900 text-white shadow-xl">
         <div className="max-w-6xl mx-auto p-6 md:p-8">
           
-          <div className="flex flex-col md:flex-row items-center gap-6">
+          <div className="flex flex-col md:flex-row gap-6">
              {/* Logo Placeholder */}
             <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
                <img 
                   src="tiger-logo.png" 
                   alt="Ogden Tiger" 
-                  className="w-full h-full object-contain p-1" // Removed bg-white, changed to object-contain
+                  className="w-full h-full object-contain p-1"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
@@ -370,7 +430,7 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="flex-grow text-center md:text-left">
+            <div className="flex-grow flex flex-col justify-center text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start space-x-3 mb-2">
                   <GraduationCap className="w-8 h-8 text-orange-400" />
                   <span className="text-orange-200 font-semibold tracking-wider text-sm uppercase">Ogden School District • WSU</span>
@@ -379,7 +439,7 @@ const App: React.FC = () => {
                   Earn Your Associate's Degree in High School
                 </h1>
                 <p className="text-slate-300 max-w-2xl text-lg mb-4 mx-auto md:mx-0">
-                  Get a head start on college by fulfilling your General Education requirements while still at Ogden High.
+                  Get a head start on college by fulfilling your General Education requirements while still in high school.
                 </p>
                 
                 {/* Info Tooltips - Moved Here */}
@@ -401,6 +461,74 @@ const App: React.FC = () => {
                         <li>1 Cultural Competence course (*)</li>
                       </ul>
                    </Tooltip>
+                </div>
+            </div>
+
+            {/* --- NEW: Graduation Countdown Widget in Header + EMAIL FORM --- */}
+            <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 flex flex-col gap-4 flex-shrink-0">
+                {/* Countdown Section */}
+                <div>
+                  <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
+                    <Clock className="w-3 h-3 mr-1.5" /> Time Until 10th Grade
+                  </h3>
+                  
+                  {isEditingDob || !gradStats ? (
+                    <div className="text-center">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center bg-white/10 border border-white/20 rounded px-2 py-1.5 flex-grow">
+                          <Calendar className="w-3 h-3 text-orange-200 mr-2 flex-shrink-0" />
+                          <input 
+                            type="date" 
+                            className="text-xs text-white bg-transparent outline-none w-full placeholder-white/50"
+                            value={childDob}
+                            onChange={(e) => setChildDob(e.target.value)}
+                          />
+                        </div>
+                        <button 
+                          onClick={handleSaveDob}
+                          disabled={!childDob}
+                          className="bg-orange-600 text-white p-1.5 rounded hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Save Date"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Enter student birthdate</p>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                        <div className="text-3xl font-black text-white mb-0 leading-none">{gradStats.days}</div>
+                        <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Days Left</div>
+                        <div className="pt-2 border-t border-white/10 text-[10px] text-slate-400 flex justify-between items-center">
+                          <span>Starts: <strong>Sep {gradStats.year}</strong></span>
+                          <button onClick={() => setIsEditingDob(true)} className="text-orange-300 hover:text-white underline">Edit</button>
+                        </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Email Plan Section */}
+                <div className="pt-4 border-t border-white/10">
+                   <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
+                      <Mail className="w-3 h-3 mr-1.5" /> Share Plan
+                   </h3>
+                   <form onSubmit={handleShare} className="flex flex-col space-y-2">
+                      <input
+                        type="email"
+                        placeholder="Parent email..."
+                        className="px-3 py-1.5 bg-white/10 border border-white/20 rounded text-xs text-white placeholder-white/40 outline-none focus:ring-1 focus:ring-orange-500 w-full"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                      <button 
+                        type="submit" 
+                        disabled={isSending}
+                        className="w-full bg-orange-600 text-white py-1.5 rounded text-xs font-bold hover:bg-orange-500 transition-colors flex items-center justify-center disabled:opacity-50"
+                      >
+                        {isSending ? 'Sending...' : 'Send PDF'}
+                      </button>
+                   </form>
                 </div>
             </div>
           </div>
