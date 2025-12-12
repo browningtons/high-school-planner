@@ -415,12 +415,19 @@ const App: React.FC = () => {
           
           <div className="flex flex-col md:flex-row gap-6">
              {/* Logo Placeholder */}
-            <div className="w-full h-full object-cover translate-y-[-2px]">
-              <img
-                src="tiger-logo.png"
-                alt="Ogden Tiger"
-                className="hidden md:block w-24 h-24 rounded-full border-4 border-white/20 shadow-lg object-cover"
-              />
+            <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
+               <img 
+                  src="tiger-logo.png" 
+                  alt="Ogden Tiger" 
+                  className="w-full h-full object-contain p-2"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                  }} 
+               />
+               <div className="absolute inset-0 flex items-center justify-center text-white font-bold text-xs" style={{zIndex: -1}}>
+                  TIGER LOGO
+               </div>
             </div>
             
             <div className="flex-grow flex flex-col justify-center text-center md:text-left">
