@@ -423,7 +423,7 @@ const App: React.FC = () => {
               <img
                 src="tiger-logo.png"
                 alt="Ogden Tiger"
-                className="relative z-10 w-full h-full object-contain scale-[1.20]"
+                className="relative z-10 w-full h-full object-contain scale-[0.95]"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
