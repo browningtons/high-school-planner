@@ -415,21 +415,21 @@ const App: React.FC = () => {
           
           <div className="flex flex-col md:flex-row gap-6">
              {/* Logo Placeholder */}
-            <div className="hidden md:flex w-24 h-24 relative flex-shrink-0 items-center justify-center">
-              {/* Ring (background layer) */}
-              <div className="absolute inset-0 rounded-full border-4 border-white/20 bg-white/10 shadow-lg" />
-            
-              {/* Tiger (foreground layer) */}
-              <img
-                src="tiger-logo.png"
-                alt="Ogden Tiger"
-                className="relative z-10 w-full h-full object-contain scale-[0.95]"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+            <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
+               <img 
+                  src="tiger-logo.png" 
+                  alt="Ogden Tiger" 
+                  className="w-full h-full object-contain p-1"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                  }} 
+               />
+               <div className="absolute inset-0 flex items-center justify-center text-white font-bold text-xs" style={{zIndex: -1}}>
+                  TIGER LOGO
+               </div>
             </div>
-            
+
             <div className="flex-grow flex flex-col justify-center text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start space-x-3 mb-2">
                   <GraduationCap className="w-8 h-8 text-orange-400" />
@@ -672,21 +672,21 @@ const App: React.FC = () => {
           </div>
 
           {/* Gen Ed Requirements Grid - COMPACT */}
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 flex flex-col h-full">
              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">Gen Ed Categories</h3>
+                <h3 className="text-lg font-bold text-gray-900">General Education Categories</h3>
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">9 Required</span>
              </div>
-             <div className="grid grid-cols-3 gap-1">
+             <div className="grid grid-cols-3 gap-2 flex-grow">
                 {REQUIRED_CATEGORIES.map(cat => {
                    const isDone = satisfiedCats.has(cat);
                    return (
-                     <div key={cat} className={`flex flex-col items-center justify-center p-1 rounded text-center border h-auto py-2 ${isDone ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
+                     <div key={cat} className={`flex flex-col items-center justify-center p-2 rounded text-center border h-full w-full transition-colors ${isDone ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
                         {isDone 
-                          ? <CheckCircle className="w-4 h-4 text-green-600 mb-0.5" />
-                          : <Circle className="w-4 h-4 text-gray-300 mb-0.5" />
+                          ? <CheckCircle className="w-5 h-5 text-green-600 mb-1" />
+                          : <Circle className="w-5 h-5 text-gray-300 mb-1" />
                         }
-                        <span className={`text-[9px] leading-tight font-medium ${isDone ? 'text-green-800' : 'text-gray-400'}`}>
+                        <span className={`text-[10px] leading-tight font-medium ${isDone ? 'text-green-800' : 'text-gray-400'}`}>
                           {cat}
                         </span>
                      </div>
@@ -694,7 +694,7 @@ const App: React.FC = () => {
                 })}
              </div>
              {remainingCats.length > 0 && (
-                <div className="mt-3 text-[10px] text-yellow-800 bg-yellow-100 p-1.5 rounded text-center font-medium border border-yellow-200">
+                <div className="mt-3 text-[10px] text-yellow-800 bg-yellow-100 p-2 rounded text-center font-medium border border-yellow-200">
                    Missing: {remainingCats.length} categories
                 </div>
              )}
