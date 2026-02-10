@@ -548,7 +548,7 @@ const App: React.FC = () => {
             </div>
 
 	            {/* Graduation Countdown Widget in Header */}
-	            <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 flex flex-col gap-4 flex-shrink-0">
+	            <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 flex-shrink-0 self-start h-fit">
                 {/* Countdown Section */}
                 <div>
                   <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
