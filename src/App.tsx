@@ -233,110 +233,13 @@ const Tooltip: React.FC<{ icon: React.ReactNode; title: string; children: React.
   );
 };
 
-const escapePdfText = (value: string): string =>
-  value
-    .replace(/[^\x20-\x7E]/g, '')
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
-
-const createPdfBlob = (rawLines: string[]): Blob => {
-  const lines = rawLines.length > 0 ? rawLines : ['No plan data available'];
-  const linesPerPage = 48;
-  const pages: string[][] = [];
-
-  for (let i = 0; i < lines.length; i += linesPerPage) {
-    pages.push(lines.slice(i, i + linesPerPage));
-  }
-
-  const objects = new Map<number, string>();
-  const fontObject = 3;
-
-  const pageObjectNumbers: number[] = [];
-  pages.forEach((pageLines, pageIndex) => {
-    const pageObject = 4 + pageIndex * 2;
-    const contentObject = pageObject + 1;
-    pageObjectNumbers.push(pageObject);
-
-    const contentStream = [
-      'BT',
-      '/F1 11 Tf',
-      '50 742 Td',
-      '14 TL',
-      ...pageLines.map((line, idx) =>
-        idx === 0 ? `(${escapePdfText(line)}) Tj` : `T* (${escapePdfText(line)}) Tj`
-      ),
-      'ET',
-    ].join('\n');
-
-    objects.set(
-      contentObject,
-      `<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`
-    );
-
-    objects.set(
-      pageObject,
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObject} 0 R >> >> /Contents ${contentObject} 0 R >>`
-    );
-  });
-
-  objects.set(
-    2,
-    `<< /Type /Pages /Kids [${pageObjectNumbers.map((n) => `${n} 0 R`).join(' ')}] /Count ${pageObjectNumbers.length} >>`
-  );
-  objects.set(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-  objects.set(1, '<< /Type /Catalog /Pages 2 0 R >>');
-
-  const objectNumbers = Array.from(objects.keys()).sort((a, b) => a - b);
-  const maxObjectNumber = objectNumbers[objectNumbers.length - 1];
-  const offsets: number[] = [];
-  let pdf = '%PDF-1.4\n';
-
-  objectNumbers.forEach((objectNumber) => {
-    offsets[objectNumber] = pdf.length;
-    pdf += `${objectNumber} 0 obj\n${objects.get(objectNumber)}\nendobj\n`;
-  });
-
-  const xrefStart = pdf.length;
-  pdf += `xref\n0 ${maxObjectNumber + 1}\n`;
-  pdf += '0000000000 65535 f \n';
-
-  for (let i = 1; i <= maxObjectNumber; i += 1) {
-    const offset = offsets[i] ?? 0;
-    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  }
-
-  pdf += `trailer\n<< /Size ${maxObjectNumber + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-  return new Blob([pdf], { type: 'application/pdf' });
-};
-
-const blobToBase64 = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onerror = () => reject(new Error('Unable to read PDF blob.'));
-    reader.onloadend = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to parse PDF blob.'));
-        return;
-      }
-
-      const [, base64 = ''] = reader.result.split(',');
-      resolve(base64);
-    };
-
-    reader.readAsDataURL(blob);
-  });
-
 const App: React.FC = () => {
   const [selectedPathId, setSelectedPathId] = useState<SkillPath['id']>('tech');
   const [showFullCatalog, setShowFullCatalog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [email, setEmail] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [passedExamCourseIds, setPassedExamCourseIds] = useState<string[]>(() => {
+  const [unpassedExamCourseIds, setUnpassedExamCourseIds] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem('passed_exam_course_ids');
+      const stored = localStorage.getItem('unpassed_exam_course_ids');
       return stored ? (JSON.parse(stored) as string[]) : [];
     } catch {
       return [];
@@ -351,8 +254,8 @@ const App: React.FC = () => {
   }, [childDob]);
 
   useEffect(() => {
-    localStorage.setItem('passed_exam_course_ids', JSON.stringify(passedExamCourseIds));
-  }, [passedExamCourseIds]);
+    localStorage.setItem('unpassed_exam_course_ids', JSON.stringify(unpassedExamCourseIds));
+  }, [unpassedExamCourseIds]);
 
   const courseById = useMemo(
     () => new Map<string, HighSchoolCourse>(ALL_COURSES.map((course) => [course.id, course])),
@@ -383,15 +286,9 @@ const App: React.FC = () => {
     [courseById, plannedCourseIds]
   );
 
-  const passedExamIdSet = useMemo(() => new Set(passedExamCourseIds), [passedExamCourseIds]);
+  const unpassedExamIdSet = useMemo(() => new Set(unpassedExamCourseIds), [unpassedExamCourseIds]);
 
-  const apIbCoursesInPlan = useMemo(
-    () =>
-      plannedCourses
-        .filter((course) => course.type === 'AP' || course.type === 'IB')
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [plannedCourses]
-  );
+  const isExamBasedCourse = (course: HighSchoolCourse) => course.type === 'AP' || course.type === 'IB';
 
   const gradStats = useMemo(() => {
     if (!childDob) return null;
@@ -441,8 +338,8 @@ const App: React.FC = () => {
 
     plannedCourses.forEach((course) => {
       const courseTotal = course.wsuEquivalent.reduce((acc, eq) => acc + eq.credits, 0);
-      const isExamBasedCredit = course.type === 'AP' || course.type === 'IB';
-      const canCountCredits = !isExamBasedCredit || passedExamIdSet.has(course.id);
+      const isExamBasedCredit = isExamBasedCourse(course);
+      const canCountCredits = !isExamBasedCredit || !unpassedExamIdSet.has(course.id);
 
       if (isExamBasedCredit) {
         apIbPotential += courseTotal;
@@ -473,7 +370,7 @@ const App: React.FC = () => {
       apIbPotentialCredits: apIbPotential,
       apIbEarnedCredits: apIbEarned,
     };
-  }, [passedExamIdSet, plannedCourses]);
+  }, [plannedCourses, unpassedExamIdSet]);
 
   const uniqueCourseCount = plannedCourses.length;
   const uniqueRecommendedElectiveIds = useMemo(
@@ -481,109 +378,32 @@ const App: React.FC = () => {
     [selectedPath]
   );
 
-  const handleTogglePassedExamCourse = (courseId: string) => {
-    setPassedExamCourseIds((current) =>
+  const handleToggleExamPassed = (courseId: string) => {
+    setUnpassedExamCourseIds((current) =>
       current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
     );
   };
 
-  const handleShare = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
+  const yearlyCreditTotals = useMemo(() => {
+    const sumCredits = (ids: string[]) =>
+      ids.reduce((total, id) => {
+        const course = courseById.get(id);
+        if (!course) return total;
 
-    setIsSending(true);
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const filename = `high-school-plan-${selectedPath.id}-${now.toISOString().slice(0, 10)}.pdf`;
+        const courseCredits = course.wsuEquivalent.reduce((acc, eq) => acc + eq.credits, 0);
+        if (isExamBasedCourse(course) && unpassedExamIdSet.has(course.id)) {
+          return total;
+        }
 
-    const formatCourseLine = (id: string) => {
-      const course = getCourse(id);
-      if (!course) return `- Missing course reference: ${id}`;
+        return total + courseCredits;
+      }, 0);
 
-      const credits = course.wsuEquivalent.reduce((acc, curr) => acc + curr.credits, 0);
-      const isExamBasedCredit = course.type === 'AP' || course.type === 'IB';
-      const examStatus = isExamBasedCredit
-        ? passedExamIdSet.has(course.id)
-          ? 'exam passed'
-          : 'exam not passed'
-        : 'no exam required';
-
-      return `- ${course.name} (${course.type}, ${credits} cr, ${examStatus})`;
+    return {
+      grade10: sumCredits(selectedPath.schedule.grade10),
+      grade11: sumCredits(selectedPath.schedule.grade11),
+      grade12: sumCredits(selectedPath.schedule.grade12),
     };
-
-    const pdfLines = [
-      'High School Planner - Associate Degree Plan',
-      `Generated: ${formattedDate}`,
-      `Skill Path: ${selectedPath.name}`,
-      '',
-      'Progress Summary',
-      `- Unique classes counted once: ${uniqueCourseCount}`,
-      `- Total earned credits: ${totalCredits} / 60`,
-      `- WSU CE residency credits: ${wsuResidencyCredits} / 20`,
-      `- AP/IB earned credits (passed exams): ${apIbEarnedCredits} / ${apIbPotentialCredits}`,
-      `- Missing Gen Ed categories: ${remainingCats.length > 0 ? remainingCats.join(', ') : 'None'}`,
-      '',
-      '10th Grade',
-      ...selectedPath.schedule.grade10.map(formatCourseLine),
-      '',
-      '11th Grade',
-      ...selectedPath.schedule.grade11.map(formatCourseLine),
-      '',
-      '12th Grade',
-      ...selectedPath.schedule.grade12.map(formatCourseLine),
-      '',
-      'Recommended Additions',
-      ...uniqueRecommendedElectiveIds.map(formatCourseLine),
-      '',
-      'Counselors',
-      ...COUNSELORS.map((counselor) =>
-        `- ${counselor.name}, ${counselor.role}, ${counselor.email}${counselor.assignment ? `, ${counselor.assignment}` : ''}`
-      ),
-    ];
-
-    try {
-      const pdfBlob = createPdfBlob(pdfLines);
-      const pdfBase64 = await blobToBase64(pdfBlob);
-      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
-
-      if (!apiBaseUrl) {
-        throw new Error('VITE_API_BASE_URL is not configured.');
-      }
-
-      const subject = `High School Plan PDF - ${selectedPath.name}`;
-      const text = `Attached is the generated high school associate degree plan for ${selectedPath.name} (${formattedDate}).`;
-      const response = await fetch(`${apiBaseUrl}/api/send-plan-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          toEmail: email,
-          subject,
-          text,
-          filename,
-          pdfBase64,
-        }),
-      });
-
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error || 'Email delivery failed.');
-      }
-
-      alert(`PDF sent to ${email}.`);
-      setEmail('');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to send PDF email.';
-      alert(message);
-    } finally {
-      setIsSending(false);
-    }
-  };
+  }, [courseById, selectedPath, unpassedExamIdSet]);
 
   // Filter courses for catalog (exclude ones already in path or recommended)
   const groupedCatalog = useMemo(() => {
@@ -607,8 +427,14 @@ const App: React.FC = () => {
   }, [plannedCourseIds, searchTerm]);
 
 
-  const CourseCard: React.FC<{ course: HighSchoolCourse; compact?: boolean }> = ({ course, compact }) => {
+  const CourseCard: React.FC<{ course: HighSchoolCourse; compact?: boolean; showExamToggle?: boolean }> = ({
+    course,
+    compact,
+    showExamToggle = false,
+  }) => {
     const isResidency = course.type === 'CE';
+    const isExamBasedCredit = isExamBasedCourse(course);
+    const isExamPassed = !unpassedExamIdSet.has(course.id);
     
     return (
       <div className={`bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden ${compact ? 'p-2' : 'p-3 mb-2'}`}>
@@ -643,6 +469,20 @@ const App: React.FC = () => {
             <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-semibold uppercase rounded tracking-wider border border-gray-200">
               {course.genEdCategory}
             </span>
+          </div>
+        )}
+
+        {showExamToggle && isExamBasedCredit && !compact && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                className="accent-orange-600"
+                checked={isExamPassed}
+                onChange={() => handleToggleExamPassed(course.id)}
+              />
+              <span>Exam Passed</span>
+            </label>
           </div>
         )}
       </div>
@@ -707,8 +547,8 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* --- NEW: Graduation Countdown Widget in Header + EMAIL FORM --- */}
-            <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 flex flex-col gap-4 flex-shrink-0">
+	            {/* Graduation Countdown Widget in Header */}
+	            <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 flex flex-col gap-4 flex-shrink-0">
                 {/* Countdown Section */}
                 <div>
                   <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
@@ -749,31 +589,7 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Email Plan Section */}
-	                <div className="pt-4 border-t border-white/10">
-	                   <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
-	                      <Mail className="w-3 h-3 mr-1.5" /> Send PDF Email
-	                   </h3>
-	                   <form onSubmit={handleShare} className="flex flex-col space-y-2">
-	                      <input
-	                        type="email"
-	                        placeholder="Recipient email..."
-	                        className="px-3 py-1.5 bg-white/10 border border-white/20 rounded text-xs text-white placeholder-white/40 outline-none focus:ring-1 focus:ring-orange-500 w-full"
-	                        value={email}
-	                        onChange={(e) => setEmail(e.target.value)}
-	                        required
-                      />
-                      <button 
-                        type="submit" 
-	                        disabled={isSending}
-	                        className="w-full bg-orange-600 text-white py-1.5 rounded text-xs font-bold hover:bg-orange-500 transition-colors flex items-center justify-center disabled:opacity-50"
-	                      >
-	                        {isSending ? 'Sending...' : 'Send PDF'}
-	                      </button>
-	                   </form>
-	                </div>
-            </div>
+	            </div>
           </div>
           
           {/* Action Bar: Path Selectors ONLY - Single Row */}
@@ -860,48 +676,6 @@ const App: React.FC = () => {
 	            </div>
 	        </div>
 
-	        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-	          <div className="flex items-center justify-between mb-3">
-	            <h3 className="text-lg font-bold text-gray-900">AP/IB Exam Pass Tracker</h3>
-	            <span className="text-xs bg-orange-50 text-orange-700 border border-orange-100 px-2 py-1 rounded">
-	              {apIbCoursesInPlan.filter((course) => passedExamIdSet.has(course.id)).length} / {apIbCoursesInPlan.length} passed
-	            </span>
-	          </div>
-	          <p className="text-sm text-gray-600 mb-4">
-	            Mark each AP/IB exam as passed. Credits and Gen Ed completion update instantly.
-	          </p>
-	          {apIbCoursesInPlan.length === 0 ? (
-	            <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-	              This path does not include AP or IB classes.
-	            </div>
-	          ) : (
-	            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-	              {apIbCoursesInPlan.map((course) => {
-	                const courseCredits = course.wsuEquivalent.reduce((acc, curr) => acc + curr.credits, 0);
-	                return (
-	                  <label
-	                    key={course.id}
-	                    className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-100"
-	                  >
-	                    <input
-	                      type="checkbox"
-	                      className="mt-1 accent-orange-600"
-	                      checked={passedExamIdSet.has(course.id)}
-	                      onChange={() => handleTogglePassedExamCourse(course.id)}
-	                    />
-	                    <div className="min-w-0">
-	                      <div className="font-semibold text-sm text-gray-900">{course.name}</div>
-	                      <div className="text-xs text-gray-500">
-	                        {course.type} • {courseCredits} credits
-	                      </div>
-	                    </div>
-	                  </label>
-	                );
-	              })}
-	            </div>
-	          )}
-	        </div>
-	        
 	        {/* SECTION 2: YEARLY ROADMAP */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -915,10 +689,13 @@ const App: React.FC = () => {
                 <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">10</div>
                 <h3 className="font-bold text-gray-800">Sophomore</h3>
               </div>
+              <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
+                Total College Credit Hours: {yearlyCreditTotals.grade10}
+              </div>
               <div className="space-y-2 flex-grow">
                 {selectedPath.schedule.grade10.map(id => {
                   const c = getCourse(id);
-                  return c ? <CourseCard key={id} course={c} /> : null;
+                  return c ? <CourseCard key={id} course={c} showExamToggle /> : null;
                 })}
               </div>
             </div>
@@ -929,10 +706,13 @@ const App: React.FC = () => {
                 <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">11</div>
                 <h3 className="font-bold text-gray-800">Junior</h3>
               </div>
+              <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
+                Total College Credit Hours: {yearlyCreditTotals.grade11}
+              </div>
               <div className="space-y-2 flex-grow">
                 {selectedPath.schedule.grade11.map(id => {
                    const c = getCourse(id);
-                   return c ? <CourseCard key={id} course={c} /> : null;
+                   return c ? <CourseCard key={id} course={c} showExamToggle /> : null;
                 })}
               </div>
             </div>
@@ -943,10 +723,13 @@ const App: React.FC = () => {
                 <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">12</div>
                 <h3 className="font-bold text-gray-800">Senior</h3>
               </div>
+              <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
+                Total College Credit Hours: {yearlyCreditTotals.grade12}
+              </div>
               <div className="space-y-2 flex-grow">
                 {selectedPath.schedule.grade12.map(id => {
                    const c = getCourse(id);
-                   return c ? <CourseCard key={id} course={c} /> : null;
+                   return c ? <CourseCard key={id} course={c} showExamToggle /> : null;
                 })}
               </div>
             </div>
