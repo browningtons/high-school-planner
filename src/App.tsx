@@ -233,136 +233,378 @@ const Tooltip: React.FC<{ icon: React.ReactNode; title: string; children: React.
   );
 };
 
+const escapePdfText = (value: string): string =>
+  value
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
+
+const createPdfBlob = (rawLines: string[]): Blob => {
+  const lines = rawLines.length > 0 ? rawLines : ['No plan data available'];
+  const linesPerPage = 48;
+  const pages: string[][] = [];
+
+  for (let i = 0; i < lines.length; i += linesPerPage) {
+    pages.push(lines.slice(i, i + linesPerPage));
+  }
+
+  const objects = new Map<number, string>();
+  const fontObject = 3;
+
+  const pageObjectNumbers: number[] = [];
+  pages.forEach((pageLines, pageIndex) => {
+    const pageObject = 4 + pageIndex * 2;
+    const contentObject = pageObject + 1;
+    pageObjectNumbers.push(pageObject);
+
+    const contentStream = [
+      'BT',
+      '/F1 11 Tf',
+      '50 742 Td',
+      '14 TL',
+      ...pageLines.map((line, idx) =>
+        idx === 0 ? `(${escapePdfText(line)}) Tj` : `T* (${escapePdfText(line)}) Tj`
+      ),
+      'ET',
+    ].join('\n');
+
+    objects.set(
+      contentObject,
+      `<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`
+    );
+
+    objects.set(
+      pageObject,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObject} 0 R >> >> /Contents ${contentObject} 0 R >>`
+    );
+  });
+
+  objects.set(
+    2,
+    `<< /Type /Pages /Kids [${pageObjectNumbers.map((n) => `${n} 0 R`).join(' ')}] /Count ${pageObjectNumbers.length} >>`
+  );
+  objects.set(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  objects.set(1, '<< /Type /Catalog /Pages 2 0 R >>');
+
+  const objectNumbers = Array.from(objects.keys()).sort((a, b) => a - b);
+  const maxObjectNumber = objectNumbers[objectNumbers.length - 1];
+  const offsets: number[] = [];
+  let pdf = '%PDF-1.4\n';
+
+  objectNumbers.forEach((objectNumber) => {
+    offsets[objectNumber] = pdf.length;
+    pdf += `${objectNumber} 0 obj\n${objects.get(objectNumber)}\nendobj\n`;
+  });
+
+  const xrefStart = pdf.length;
+  pdf += `xref\n0 ${maxObjectNumber + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+
+  for (let i = 1; i <= maxObjectNumber; i += 1) {
+    const offset = offsets[i] ?? 0;
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  }
+
+  pdf += `trailer\n<< /Size ${maxObjectNumber + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return new Blob([pdf], { type: 'application/pdf' });
+};
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onerror = () => reject(new Error('Unable to read PDF blob.'));
+    reader.onloadend = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Unable to parse PDF blob.'));
+        return;
+      }
+
+      const [, base64 = ''] = reader.result.split(',');
+      resolve(base64);
+    };
+
+    reader.readAsDataURL(blob);
+  });
+
 const App: React.FC = () => {
   const [selectedPathId, setSelectedPathId] = useState<SkillPath['id']>('tech');
   const [showFullCatalog, setShowFullCatalog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [passedExamCourseIds, setPassedExamCourseIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('passed_exam_course_ids');
+      return stored ? (JSON.parse(stored) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
   
-  // --- NEW: DOB State & Logic ---
   const [childDob, setChildDob] = useState<string>(() => localStorage.getItem('child_dob') || '');
-  // State to track if we are in "edit mode" for the date. 
-  // If no date exists in storage, default to true.
   const [isEditingDob, setIsEditingDob] = useState<boolean>(!localStorage.getItem('child_dob'));
 
   useEffect(() => {
     localStorage.setItem('child_dob', childDob);
   }, [childDob]);
 
+  useEffect(() => {
+    localStorage.setItem('passed_exam_course_ids', JSON.stringify(passedExamCourseIds));
+  }, [passedExamCourseIds]);
+
+  const courseById = useMemo(
+    () => new Map<string, HighSchoolCourse>(ALL_COURSES.map((course) => [course.id, course])),
+    []
+  );
+
+  const getCourse = (id: string) => courseById.get(id);
+  const selectedPath = useMemo(() => SKILL_PATHS.find((p) => p.id === selectedPathId)!, [selectedPathId]);
+
+  const plannedCourseIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...selectedPath.schedule.grade10,
+          ...selectedPath.schedule.grade11,
+          ...selectedPath.schedule.grade12,
+          ...selectedPath.recommendedElectives,
+        ])
+      ),
+    [selectedPath]
+  );
+
+  const plannedCourses = useMemo(
+    () =>
+      plannedCourseIds
+        .map((id) => courseById.get(id))
+        .filter((course): course is HighSchoolCourse => Boolean(course)),
+    [courseById, plannedCourseIds]
+  );
+
+  const passedExamIdSet = useMemo(() => new Set(passedExamCourseIds), [passedExamCourseIds]);
+
+  const apIbCoursesInPlan = useMemo(
+    () =>
+      plannedCourses
+        .filter((course) => course.type === 'AP' || course.type === 'IB')
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [plannedCourses]
+  );
+
   const gradStats = useMemo(() => {
     if (!childDob) return null;
-    const dob = new Date(childDob);
+    const [year, month, day] = childDob.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    // Parse as local date to avoid timezone shifts from YYYY-MM-DD strings.
+    const dob = new Date(year, month - 1, day);
     if (isNaN(dob.getTime())) return null;
 
     // Estimate graduation: typically May of the year they turn 18.
-    // Cutoff logic: If born Sep-Dec, usually graduate year they turn 19.
-    const month = dob.getMonth(); // 0-11
+    // If born Sep-Dec, graduation usually shifts one school year later.
+    const birthMonth = dob.getMonth(); // 0-11
     let gradYear = dob.getFullYear() + 18;
-    if (month >= 8) { // Born Sep or later
-        gradYear += 1;
+    if (birthMonth >= 8) {
+      gradYear += 1;
     }
     
-    // 10th Grade Start calculation:
-    // Graduation is end of 12th.
-    // Start of 12th: gradYear - 1 (Sept)
-    // Start of 11th: gradYear - 2 (Sept)
-    // Start of 10th: gradYear - 3 (Sept)
     const tenthGradeYear = gradYear - 3;
-
-    // Target date: September 1st
-    const targetDate = new Date(tenthGradeYear, 8, 1); // Month 8 is September
+    const targetDate = new Date(tenthGradeYear, 8, 1);
     const today = new Date();
     
-    // Calculate difference
     const diff = targetDate.getTime() - today.getTime();
     const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
     
     return { date: targetDate, days: Math.max(0, daysLeft), year: tenthGradeYear };
   }, [childDob]);
-  // -----------------------------
-
-  const handleShare = (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!email) return;
-    setIsSending(true);
-    // Simulate API call
-    setTimeout(() => {
-        alert(`PDF Plan sent to ${email}!`);
-        setIsSending(false);
-        setEmail('');
-    }, 1500);
-  };
 
   const handleSaveDob = () => {
     setIsEditingDob(false);
   };
 
-  const selectedPath = useMemo(() => SKILL_PATHS.find(p => p.id === selectedPathId)!, [selectedPathId]);
-
-  // Helper to get course object from ID
-  const getCourse = (id: string) => ALL_COURSES.find(c => c.id === id);
-
   // Computed data for the selected path
-  const { satisfiedCats, totalCredits, wsuResidencyCredits, remainingCats } = useMemo(() => {
-    const allIds = [
-      ...selectedPath.schedule.grade10,
-      ...selectedPath.schedule.grade11,
-      ...selectedPath.schedule.grade12,
-      ...selectedPath.recommendedElectives
-    ];
-    
-    const courses = allIds.map(id => getCourse(id)).filter(Boolean) as HighSchoolCourse[];
-    
+  const {
+    satisfiedCats,
+    totalCredits,
+    wsuResidencyCredits,
+    remainingCats,
+    apIbPotentialCredits,
+    apIbEarnedCredits,
+  } = useMemo(() => {
     const satisfied = new Set<GenEdCategory>();
     let total = 0;
     let residency = 0;
+    let apIbPotential = 0;
+    let apIbEarned = 0;
 
-    courses.forEach(c => {
-      if (c.genEdCategory) satisfied.add(c.genEdCategory);
-      
-      const courseTotal = c.wsuEquivalent.reduce((acc, eq) => acc + eq.credits, 0);
+    plannedCourses.forEach((course) => {
+      const courseTotal = course.wsuEquivalent.reduce((acc, eq) => acc + eq.credits, 0);
+      const isExamBasedCredit = course.type === 'AP' || course.type === 'IB';
+      const canCountCredits = !isExamBasedCredit || passedExamIdSet.has(course.id);
+
+      if (isExamBasedCredit) {
+        apIbPotential += courseTotal;
+      }
+
+      if (!canCountCredits) {
+        return;
+      }
+
+      if (course.genEdCategory) satisfied.add(course.genEdCategory);
       total += courseTotal;
 
-      if (c.type === 'CE') {
+      if (course.type === 'CE') {
         residency += courseTotal;
+      }
+      if (isExamBasedCredit) {
+        apIbEarned += courseTotal;
       }
     });
 
-    const remaining = REQUIRED_CATEGORIES.filter(cat => !satisfied.has(cat));
+    const remaining = REQUIRED_CATEGORIES.filter((cat) => !satisfied.has(cat));
 
     return { 
       satisfiedCats: satisfied, 
       totalCredits: total, 
       wsuResidencyCredits: residency,
-      remainingCats: remaining
+      remainingCats: remaining,
+      apIbPotentialCredits: apIbPotential,
+      apIbEarnedCredits: apIbEarned,
     };
-  }, [selectedPath]);
+  }, [passedExamIdSet, plannedCourses]);
+
+  const uniqueCourseCount = plannedCourses.length;
+  const uniqueRecommendedElectiveIds = useMemo(
+    () => Array.from(new Set(selectedPath.recommendedElectives)),
+    [selectedPath]
+  );
+
+  const handleTogglePassedExamCourse = (courseId: string) => {
+    setPassedExamCourseIds((current) =>
+      current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
+    );
+  };
+
+  const handleShare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+
+    setIsSending(true);
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const filename = `high-school-plan-${selectedPath.id}-${now.toISOString().slice(0, 10)}.pdf`;
+
+    const formatCourseLine = (id: string) => {
+      const course = getCourse(id);
+      if (!course) return `- Missing course reference: ${id}`;
+
+      const credits = course.wsuEquivalent.reduce((acc, curr) => acc + curr.credits, 0);
+      const isExamBasedCredit = course.type === 'AP' || course.type === 'IB';
+      const examStatus = isExamBasedCredit
+        ? passedExamIdSet.has(course.id)
+          ? 'exam passed'
+          : 'exam not passed'
+        : 'no exam required';
+
+      return `- ${course.name} (${course.type}, ${credits} cr, ${examStatus})`;
+    };
+
+    const pdfLines = [
+      'High School Planner - Associate Degree Plan',
+      `Generated: ${formattedDate}`,
+      `Skill Path: ${selectedPath.name}`,
+      '',
+      'Progress Summary',
+      `- Unique classes counted once: ${uniqueCourseCount}`,
+      `- Total earned credits: ${totalCredits} / 60`,
+      `- WSU CE residency credits: ${wsuResidencyCredits} / 20`,
+      `- AP/IB earned credits (passed exams): ${apIbEarnedCredits} / ${apIbPotentialCredits}`,
+      `- Missing Gen Ed categories: ${remainingCats.length > 0 ? remainingCats.join(', ') : 'None'}`,
+      '',
+      '10th Grade',
+      ...selectedPath.schedule.grade10.map(formatCourseLine),
+      '',
+      '11th Grade',
+      ...selectedPath.schedule.grade11.map(formatCourseLine),
+      '',
+      '12th Grade',
+      ...selectedPath.schedule.grade12.map(formatCourseLine),
+      '',
+      'Recommended Additions',
+      ...uniqueRecommendedElectiveIds.map(formatCourseLine),
+      '',
+      'Counselors',
+      ...COUNSELORS.map((counselor) =>
+        `- ${counselor.name}, ${counselor.role}, ${counselor.email}${counselor.assignment ? `, ${counselor.assignment}` : ''}`
+      ),
+    ];
+
+    try {
+      const pdfBlob = createPdfBlob(pdfLines);
+      const pdfBase64 = await blobToBase64(pdfBlob);
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+
+      if (!apiBaseUrl) {
+        throw new Error('VITE_API_BASE_URL is not configured.');
+      }
+
+      const subject = `High School Plan PDF - ${selectedPath.name}`;
+      const text = `Attached is the generated high school associate degree plan for ${selectedPath.name} (${formattedDate}).`;
+      const response = await fetch(`${apiBaseUrl}/api/send-plan-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          toEmail: email,
+          subject,
+          text,
+          filename,
+          pdfBase64,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Email delivery failed.');
+      }
+
+      alert(`PDF sent to ${email}.`);
+      setEmail('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send PDF email.';
+      alert(message);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   // Filter courses for catalog (exclude ones already in path or recommended)
   const groupedCatalog = useMemo(() => {
-    const pathIds = new Set([
-      ...selectedPath.schedule.grade10,
-      ...selectedPath.schedule.grade11,
-      ...selectedPath.schedule.grade12,
-      ...selectedPath.recommendedElectives
-    ]);
+    const pathIds = new Set(plannedCourseIds);
     
-    const available = ALL_COURSES.filter(c => !pathIds.has(c.id)).filter(c => 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      c.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchTerm.toLowerCase())
+    const available = ALL_COURSES.filter((c) => !pathIds.has(c.id)).filter(
+      (c) =>
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Group by category
     const groups: Record<string, HighSchoolCourse[]> = {};
-    available.forEach(course => {
+    available.forEach((course) => {
       if (!groups[course.category]) groups[course.category] = [];
       groups[course.category].push(course);
     });
     
     return groups;
-  }, [selectedPath, searchTerm]);
+  }, [plannedCourseIds, searchTerm]);
 
 
   const CourseCard: React.FC<{ course: HighSchoolCourse; compact?: boolean }> = ({ course, compact }) => {
@@ -452,15 +694,16 @@ const App: React.FC = () => {
                       </div>
                    </Tooltip>
 
-                   <Tooltip icon={<List className="w-4 h-4" />} title="Core Requirements">
-                      <h4 className="font-bold text-orange-600 mb-2">To Earn the Degree:</h4>
-                      <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
-                        <li><strong>60 Total</strong> Credit Hours</li>
-                        <li>1 course from EACH Gen Ed category</li>
-                        <li><strong>20 Credits</strong> from WSU (CE)</li>
-                        <li>1 Cultural Competence course (*)</li>
-                      </ul>
-                   </Tooltip>
+	                   <Tooltip icon={<List className="w-4 h-4" />} title="Core Requirements">
+	                      <h4 className="font-bold text-orange-600 mb-2">To Earn the Degree:</h4>
+	                      <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
+	                        <li><strong>60 Total</strong> Credit Hours</li>
+	                        <li>1 course from EACH Gen Ed category</li>
+	                        <li><strong>20 Credits</strong> from WSU (CE)</li>
+	                        <li>AP/IB credits count only after passing exams</li>
+	                        <li>1 Cultural Competence course (*)</li>
+	                      </ul>
+	                   </Tooltip>
                 </div>
             </div>
 
@@ -508,28 +751,28 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Email Plan Section */}
-                <div className="pt-4 border-t border-white/10">
-                   <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
-                      <Mail className="w-3 h-3 mr-1.5" /> Share Plan
-                   </h3>
-                   <form onSubmit={handleShare} className="flex flex-col space-y-2">
-                      <input
-                        type="email"
-                        placeholder="Parent email..."
-                        className="px-3 py-1.5 bg-white/10 border border-white/20 rounded text-xs text-white placeholder-white/40 outline-none focus:ring-1 focus:ring-orange-500 w-full"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
+	                <div className="pt-4 border-t border-white/10">
+	                   <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
+	                      <Mail className="w-3 h-3 mr-1.5" /> Send PDF Email
+	                   </h3>
+	                   <form onSubmit={handleShare} className="flex flex-col space-y-2">
+	                      <input
+	                        type="email"
+	                        placeholder="Recipient email..."
+	                        className="px-3 py-1.5 bg-white/10 border border-white/20 rounded text-xs text-white placeholder-white/40 outline-none focus:ring-1 focus:ring-orange-500 w-full"
+	                        value={email}
+	                        onChange={(e) => setEmail(e.target.value)}
+	                        required
                       />
                       <button 
                         type="submit" 
-                        disabled={isSending}
-                        className="w-full bg-orange-600 text-white py-1.5 rounded text-xs font-bold hover:bg-orange-500 transition-colors flex items-center justify-center disabled:opacity-50"
-                      >
-                        {isSending ? 'Sending...' : 'Send PDF'}
-                      </button>
-                   </form>
-                </div>
+	                        disabled={isSending}
+	                        className="w-full bg-orange-600 text-white py-1.5 rounded text-xs font-bold hover:bg-orange-500 transition-colors flex items-center justify-center disabled:opacity-50"
+	                      >
+	                        {isSending ? 'Sending...' : 'Send PDF'}
+	                      </button>
+	                   </form>
+	                </div>
             </div>
           </div>
           
@@ -567,24 +810,26 @@ const App: React.FC = () => {
               Degree Progress Dashboard
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               {/* Total Credits */}
-               <div>
-                  <div className="flex justify-between text-sm font-semibold mb-1">
-                    <span className="text-gray-700">Total Credits (CE + AP/IB)</span>
-                    <span className={totalCredits >= 60 ? 'text-green-600' : 'text-gray-500'}>
-                      {totalCredits} / 60
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
+	            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+	               {/* Total Credits */}
+	               <div>
+	                  <div className="flex justify-between text-sm font-semibold mb-1">
+	                    <span className="text-gray-700">Total Earned Credits (unique classes)</span>
+	                    <span className={totalCredits >= 60 ? 'text-green-600' : 'text-gray-500'}>
+	                      {totalCredits} / 60
+	                    </span>
+	                  </div>
+	                  <div className="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
                     <div 
                       className={`h-4 rounded-full transition-all duration-500 ${totalCredits >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} 
-                      style={{ width: `${Math.min(100, (totalCredits / 60) * 100)}%` }}
-                    ></div>
-                    <div className="absolute top-0 bottom-0 border-l-2 border-white opacity-50 border-dashed" style={{ left: '33%' }} title="20 Credit Residency Line"></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Goal: 60 Total Credits for Associate's Degree</p>
-               </div>
+	                      style={{ width: `${Math.min(100, (totalCredits / 60) * 100)}%` }}
+	                    ></div>
+	                    <div className="absolute top-0 bottom-0 border-l-2 border-white opacity-50 border-dashed" style={{ left: '33%' }} title="20 Credit Residency Line"></div>
+	                  </div>
+	                  <p className="text-xs text-gray-500 mt-1">
+	                    AP/IB credits only count when the exam is marked as passed.
+	                  </p>
+	               </div>
 
                {/* Residency Check */}
                <div className={`p-3 rounded-lg border flex items-center ${wsuResidencyCredits >= 20 ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
@@ -596,12 +841,68 @@ const App: React.FC = () => {
                     <p className={`text-xs leading-tight ${wsuResidencyCredits >= 20 ? 'text-green-700' : 'text-orange-700'}`}>
                        {wsuResidencyCredits >= 20 ? 'Requirement Met' : 'Need 20 credits from Concurrent Enrollment (CE) courses.'}
                     </p>
-                  </div>
-               </div>
-            </div>
-        </div>
-        
-        {/* SECTION 2: YEARLY ROADMAP */}
+	                  </div>
+	               </div>
+	            </div>
+	            <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+	              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+	                <span className="text-gray-500">Unique classes counted</span>
+	                <div className="font-bold text-gray-900">{uniqueCourseCount}</div>
+	              </div>
+	              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+	                <span className="text-gray-500">AP/IB credits earned</span>
+	                <div className="font-bold text-gray-900">{apIbEarnedCredits}</div>
+	              </div>
+	              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+	                <span className="text-gray-500">AP/IB credit potential</span>
+	                <div className="font-bold text-gray-900">{apIbPotentialCredits}</div>
+	              </div>
+	            </div>
+	        </div>
+
+	        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+	          <div className="flex items-center justify-between mb-3">
+	            <h3 className="text-lg font-bold text-gray-900">AP/IB Exam Pass Tracker</h3>
+	            <span className="text-xs bg-orange-50 text-orange-700 border border-orange-100 px-2 py-1 rounded">
+	              {apIbCoursesInPlan.filter((course) => passedExamIdSet.has(course.id)).length} / {apIbCoursesInPlan.length} passed
+	            </span>
+	          </div>
+	          <p className="text-sm text-gray-600 mb-4">
+	            Mark each AP/IB exam as passed. Credits and Gen Ed completion update instantly.
+	          </p>
+	          {apIbCoursesInPlan.length === 0 ? (
+	            <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+	              This path does not include AP or IB classes.
+	            </div>
+	          ) : (
+	            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+	              {apIbCoursesInPlan.map((course) => {
+	                const courseCredits = course.wsuEquivalent.reduce((acc, curr) => acc + curr.credits, 0);
+	                return (
+	                  <label
+	                    key={course.id}
+	                    className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-100"
+	                  >
+	                    <input
+	                      type="checkbox"
+	                      className="mt-1 accent-orange-600"
+	                      checked={passedExamIdSet.has(course.id)}
+	                      onChange={() => handleTogglePassedExamCourse(course.id)}
+	                    />
+	                    <div className="min-w-0">
+	                      <div className="font-semibold text-sm text-gray-900">{course.name}</div>
+	                      <div className="text-xs text-gray-500">
+	                        {course.type} • {courseCredits} credits
+	                      </div>
+	                    </div>
+	                  </label>
+	                );
+	              })}
+	            </div>
+	          )}
+	        </div>
+	        
+	        {/* SECTION 2: YEARLY ROADMAP */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
@@ -663,12 +964,12 @@ const App: React.FC = () => {
                   Recommended Additions
                 </h3>
               </div>
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-grow">
-                {selectedPath.recommendedElectives.map(id => {
-                   const c = getCourse(id);
-                   return c ? <CourseCard key={id} course={c} /> : null;
-                })}
-              </div>
+	              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-grow">
+	                {uniqueRecommendedElectiveIds.map(id => {
+	                   const c = getCourse(id);
+	                   return c ? <CourseCard key={id} course={c} /> : null;
+	                })}
+	              </div>
           </div>
 
           {/* Gen Ed Requirements Grid - COMPACT */}

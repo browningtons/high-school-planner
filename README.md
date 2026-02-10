@@ -1,73 +1,71 @@
-# React + TypeScript + Vite
+# High School Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript planner for building an associate-degree-focused high school course roadmap.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Roadmap by skill path (Technology, Health, Business, Social Studies)
+- Degree progress dashboard (60 credits, Gen Ed categories, CE residency)
+- AP/IB exam pass tracker (AP/IB credits only count after exam pass)
+- Real PDF email delivery via backend API (Gmail SMTP)
 
-## React Compiler
+## Local Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Install dependencies:
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. Copy env template:
+```bash
+cp .env.example .env
 ```
+
+3. Fill in your `.env` values:
+- `VITE_API_BASE_URL`: frontend target for email API
+- `GMAIL_USER`: Gmail sender address
+- `GMAIL_APP_PASSWORD`: 16-character Google App Password
+- `EMAIL_FROM`: optional display name + sender (`"High School Planner <thegoldendata@gmail.com>"`)
+- `EMAIL_REPLY_TO`: optional reply-to mailbox (for example `thegoldendata@gmail.com`)
+- `ALLOWED_ORIGINS`: comma-separated frontend origins allowed to call API
+
+4. Start API server (terminal 1):
+```bash
+npm run dev:server
+```
+
+5. Start frontend (terminal 2):
+```bash
+npm run dev
+```
+
+## Email API
+
+- Endpoint: `POST /api/send-plan-email`
+- Health: `GET /api/health`
+- Server file: `server/email-api.js`
+
+The frontend generates the PDF and posts it as base64 to the API. The API sends the email with the PDF as an attachment through Gmail SMTP.
+
+## Gmail Setup (Required)
+
+1. Enable 2-Step Verification on `thegoldendata@gmail.com`.
+2. Create a Google App Password for "Mail".
+3. Put that value in `.env` as `GMAIL_APP_PASSWORD`.
+4. Set `GMAIL_USER=thegoldendata@gmail.com`.
+
+## Production Notes
+
+- This repo deploys frontend to GitHub Pages (`.github/workflows/deploy.yml`).
+- GitHub Pages is static hosting, so the email API must be deployed separately (Render, Fly.io, Railway, VPS, etc).
+- Set `VITE_API_BASE_URL` to that deployed API URL for production.
+- A Render blueprint is included at `render.yaml`.
+
+## Scripts
+
+- `npm run dev`: start Vite frontend
+- `npm run dev:client`: start Vite frontend
+- `npm run dev:server`: start Node email API
+- `npm run start:server`: start Node email API (production)
+- `npm run build`: type-check + production build
+- `npm run lint`: run ESLint

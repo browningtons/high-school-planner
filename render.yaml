@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: high-school-planner-email-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm run start:server
+    envVars:
+      - key: PORT
+        value: "8787"
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:5173,https://browningtons.github.io"
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        value: "High School Planner <thegoldendata@gmail.com>"
+      - key: EMAIL_REPLY_TO
+        value: "thegoldendata@gmail.com"
