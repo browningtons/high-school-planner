@@ -8,7 +8,8 @@
     "dev:client": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "onboarding:csv": "node scripts/generate-onboarding-csv.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.559.0",

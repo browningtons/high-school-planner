@@ -1,0 +1,30 @@
+field_name,required,data_type,allowed_values,example_value,description
+school_name,yes,string,,Ogden High School,School display name for this template.
+district_name,yes,string,,Ogden School District,District name for the school.
+timezone,yes,iana_timezone,e.g. America/Denver,America/Denver,School timezone for date/schedule logic.
+default_start_grade,yes,integer,"9,10,11,12",10,Typical first grade level shown in roadmap.
+default_target_credits,yes,integer,>= 0,60,Total college credits required for completion.
+default_ce_residency_credits,yes,integer,>= 0,20,Minimum CE/residency credits required.
+default_cultural_competence_min,yes,integer,>= 0,1,Minimum number of cultural competence courses required.
+required_gened_categories,yes,semicolon_list,,English 1; English 2; Quantitative Literacy; Humanities; American Institutions; Creative Arts; Social Sciences; Life Sciences; Physical Sciences,"Required Gen Ed categories, separated by semicolons."
+pathway_code,yes,string,unique per pathway,tech,Stable pathway identifier.
+pathway_name,yes,string,,Technology & Engineering,Pathway display name.
+pathway_description,no,string,,"Software, Engineering, Physics",Pathway summary description.
+year_level,conditional,integer_or_blank,"9,10,11,12 or blank",10,Required for placement=required; can be blank for electives.
+placement,yes,enum,"required,recommended_elective",required,Where this course sits in the pathway.
+is_required,yes,boolean,"true,false",true,Whether the pathway expects this course by default.
+sequence_order,conditional,integer_or_blank,1..N or blank,1,Order within the year for required classes.
+course_code,yes,string,unique per course,CE_ENG_1010,Stable course identifier.
+course_name,yes,string,,English 1010 CE,Course display name.
+credit_hours,yes,number,>= 0,3,Total credit hours earned for this course.
+course_type,yes,enum,"CE,AP,IB,LOCAL",CE,Course credit type.
+subject_area,yes,string,,English,Subject/category grouping for course catalog.
+gen_ed_category,no,string,,English 1,Mapped Gen Ed requirement category if applicable.
+residency_eligible,yes,boolean,"true,false",true,Whether this course counts toward residency/CE minimum.
+ap_ib_exam_required,yes,boolean,"true,false",false,Whether AP/IB exam pass is required for credits to count.
+cultural_competence,yes,boolean,"true,false",false,Whether course satisfies cultural competence.
+wsu_equivalents,no,semicolon_list,CODE (credits); CODE (credits),ENG 1010 (3),Equivalent college course mapping(s).
+prerequisites,no,semicolon_list,course_code; course_code,,Prerequisite course codes separated by semicolons.
+grade_min,no,integer_or_blank,"9,10,11,12 or blank",,Minimum grade allowed to take this course.
+grade_max,no,integer_or_blank,"9,10,11,12 or blank",,Maximum grade allowed to take this course.
+notes,no,string,,Can be scheduled in any year based on student plan.,Optional planning note for this row.
