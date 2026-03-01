@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Calendar, Clock, Check } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
@@ -206,6 +206,55 @@ const REQUIRED_CATEGORIES: GenEdCategory[] = [
   'Life Sciences', 'Physical Sciences'
 ];
 
+const REQUIRED_IMPORT_COLUMNS = [
+  'pathway_code',
+  'pathway_name',
+  'course_code',
+  'course_name',
+  'credit_hours',
+  'course_type',
+  'year_level',
+  'placement',
+];
+
+type ImportStatus =
+  | { state: 'idle' }
+  | { state: 'ok'; fileName: string; rowCount: number }
+  | { state: 'error'; fileName: string; message: string; missing?: string[] };
+
+const parseCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      i += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+};
+
 // --- COMPONENTS ---
 
 // Tooltip Component for Header Info
@@ -245,14 +294,8 @@ const App: React.FC = () => {
       return [];
     }
   });
+  const [importStatus, setImportStatus] = useState<ImportStatus>({ state: 'idle' });
   
-  const [childDob, setChildDob] = useState<string>(() => localStorage.getItem('child_dob') || '');
-  const [isEditingDob, setIsEditingDob] = useState<boolean>(!localStorage.getItem('child_dob'));
-
-  useEffect(() => {
-    localStorage.setItem('child_dob', childDob);
-  }, [childDob]);
-
   useEffect(() => {
     localStorage.setItem('unpassed_exam_course_ids', JSON.stringify(unpassedExamCourseIds));
   }, [unpassedExamCourseIds]);
@@ -291,35 +334,21 @@ const App: React.FC = () => {
   const isExamBasedCourse = (course: HighSchoolCourse) => course.type === 'AP' || course.type === 'IB';
 
   const gradStats = useMemo(() => {
-    if (!childDob) return null;
-    const [year, month, day] = childDob.split('-').map(Number);
-    if (!year || !month || !day) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let targetYear = today.getFullYear();
+    let targetDate = new Date(targetYear, 8, 1); // Sept 1
 
-    // Parse as local date to avoid timezone shifts from YYYY-MM-DD strings.
-    const dob = new Date(year, month - 1, day);
-    if (isNaN(dob.getTime())) return null;
-
-    // Estimate graduation: typically May of the year they turn 18.
-    // If born Sep-Dec, graduation usually shifts one school year later.
-    const birthMonth = dob.getMonth(); // 0-11
-    let gradYear = dob.getFullYear() + 18;
-    if (birthMonth >= 8) {
-      gradYear += 1;
+    if (today > targetDate) {
+      targetYear += 1;
+      targetDate = new Date(targetYear, 8, 1);
     }
-    
-    const tenthGradeYear = gradYear - 3;
-    const targetDate = new Date(tenthGradeYear, 8, 1);
-    const today = new Date();
-    
+
     const diff = targetDate.getTime() - today.getTime();
     const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    
-    return { date: targetDate, days: Math.max(0, daysLeft), year: tenthGradeYear };
-  }, [childDob]);
 
-  const handleSaveDob = () => {
-    setIsEditingDob(false);
-  };
+    return { date: targetDate, days: Math.max(0, daysLeft), year: targetYear };
+  }, []);
 
   // Computed data for the selected path
   const {
@@ -382,6 +411,52 @@ const App: React.FC = () => {
     setUnpassedExamCourseIds((current) =>
       current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
     );
+  };
+
+  const handleImportCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+
+      if (lines.length < 2) {
+        setImportStatus({
+          state: 'error',
+          fileName: file.name,
+          message: 'CSV needs a header row plus at least one data row.',
+        });
+        return;
+      }
+
+      const headers = parseCsvLine(lines[0]);
+      const missing = REQUIRED_IMPORT_COLUMNS.filter((column) => !headers.includes(column));
+
+      if (missing.length > 0) {
+        setImportStatus({
+          state: 'error',
+          fileName: file.name,
+          message: 'Missing required columns for onboarding.',
+          missing,
+        });
+        return;
+      }
+
+      setImportStatus({
+        state: 'ok',
+        fileName: file.name,
+        rowCount: lines.length - 1,
+      });
+    } catch {
+      setImportStatus({
+        state: 'error',
+        fileName: file.name,
+        message: 'Unable to read this CSV file.',
+      });
+    } finally {
+      event.currentTarget.value = '';
+    }
   };
 
   const yearlyCreditTotals = useMemo(() => {
@@ -555,39 +630,13 @@ const App: React.FC = () => {
                     <Clock className="w-3 h-3 mr-1.5" /> Time Until 10th Grade
                   </h3>
                   
-                  {isEditingDob || !gradStats ? (
-                    <div className="text-center">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex items-center bg-white/10 border border-white/20 rounded px-2 py-1.5 flex-grow">
-                          <Calendar className="w-3 h-3 text-orange-200 mr-2 flex-shrink-0" />
-                          <input 
-                            type="date" 
-                            className="text-xs text-white bg-transparent outline-none w-full placeholder-white/50"
-                            value={childDob}
-                            onChange={(e) => setChildDob(e.target.value)}
-                          />
-                        </div>
-                        <button 
-                          onClick={handleSaveDob}
-                          disabled={!childDob}
-                          className="bg-orange-600 text-white p-1.5 rounded hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Save Date"
-                        >
-                          <Check className="w-3 h-3" />
-                        </button>
+                  <div className="text-center">
+                      <div className="text-3xl font-black text-white mb-0 leading-none">{gradStats.days}</div>
+                      <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Days Left</div>
+                      <div className="pt-2 border-t border-white/10 text-[10px] text-slate-400 flex justify-start items-center">
+                        <span>Starts: <strong>Sep {gradStats.year}</strong></span>
                       </div>
-                      <p className="text-[10px] text-slate-400">Enter student birthdate</p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                        <div className="text-3xl font-black text-white mb-0 leading-none">{gradStats.days}</div>
-                        <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Days Left</div>
-                        <div className="pt-2 border-t border-white/10 text-[10px] text-slate-400 flex justify-between items-center">
-                          <span>Starts: <strong>Sep {gradStats.year}</strong></span>
-                          <button onClick={() => setIsEditingDob(true)} className="text-orange-300 hover:text-white underline">Edit</button>
-                        </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
 	            </div>
           </div>
@@ -618,6 +667,67 @@ const App: React.FC = () => {
       </div>
 
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
+
+        {/* SECTION: SCHOOL IMPORTER PITCH */}
+        <div className="bg-white rounded-xl shadow-md border border-blue-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 px-6 py-4">
+            <h2 className="text-lg font-bold text-blue-900 flex items-center">
+              <Upload className="w-5 h-5 mr-2" />
+              School Importer (Prototype)
+            </h2>
+            <p className="text-sm text-blue-800 mt-1">
+              Bring one CSV and this same planner can be swapped to your school&apos;s classes and pathways.
+            </p>
+          </div>
+
+          <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                Sales pitch flow: admin uploads one sheet, we validate required fields, then publish a school-branded planning site.
+              </p>
+              <div className="mt-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Required CSV columns</div>
+                <div className="flex flex-wrap gap-2">
+                  {REQUIRED_IMPORT_COLUMNS.map((column) => (
+                    <span key={column} className="text-[11px] px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-700">
+                      {column}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
+              <label className="block text-sm font-semibold text-blue-900 mb-2">Try an Admin CSV Upload</label>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleImportCsv}
+                className="block w-full text-sm text-gray-700 file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Use `school_planner_template.csv` from the onboarding generator to demo the flow.
+              </p>
+
+              {importStatus.state === 'ok' && (
+                <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                  <div className="font-semibold">CSV ready for onboarding</div>
+                  <div>{importStatus.fileName} • {importStatus.rowCount} rows detected</div>
+                </div>
+              )}
+
+              {importStatus.state === 'error' && (
+                <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="font-semibold">{importStatus.message}</div>
+                  <div className="text-xs mt-1">{importStatus.fileName}</div>
+                  {importStatus.missing && importStatus.missing.length > 0 && (
+                    <div className="text-xs mt-1">Missing: {importStatus.missing.join(', ')}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* SECTION 1: DEGREE REQUIREMENTS (TOP DASHBOARD) */}
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
