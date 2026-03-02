@@ -35,6 +35,12 @@ interface YearlySchedule {
   grade12: string[];
 }
 
+type YearBucket = keyof YearlySchedule;
+
+interface PathAssignments extends YearlySchedule {
+  pool: string[];
+}
+
 interface SkillPath {
   id: 'tech' | 'health' | 'business' | 'social';
   name: string;
@@ -217,6 +223,43 @@ const REQUIRED_IMPORT_COLUMNS = [
   'placement',
 ];
 
+const ESTIMATED_TUITION_PER_CREDIT = 120;
+
+const COUNSELOR_SETUP_STEPS = [
+  { id: 'import', label: 'Import school CSV template and validate required columns' },
+  { id: 'pathway', label: 'Choose pathway and place classes into Grade 10-12' },
+  { id: 'review', label: 'Review credits, residency, and Gen Ed coverage' },
+  { id: 'meeting', label: 'Use talking points to run student + parent signup meeting' },
+];
+
+const YEAR_LABELS: Record<YearBucket, string> = {
+  grade10: 'Grade 10',
+  grade11: 'Grade 11',
+  grade12: 'Grade 12',
+};
+
+const buildInitialAssignments = (path: SkillPath): PathAssignments => {
+  const requiredIds = new Set([
+    ...path.schedule.grade10,
+    ...path.schedule.grade11,
+    ...path.schedule.grade12,
+  ]);
+  const pool = Array.from(new Set(path.recommendedElectives)).filter((id) => !requiredIds.has(id));
+
+  return {
+    grade10: [...path.schedule.grade10],
+    grade11: [...path.schedule.grade11],
+    grade12: [...path.schedule.grade12],
+    pool,
+  };
+};
+
+const buildInitialAssignmentMap = (): Record<SkillPath['id'], PathAssignments> =>
+  SKILL_PATHS.reduce((acc, path) => {
+    acc[path.id] = buildInitialAssignments(path);
+    return acc;
+  }, {} as Record<SkillPath['id'], PathAssignments>);
+
 type ImportStatus =
   | { state: 'idle' }
   | { state: 'ok'; fileName: string; rowCount: number }
@@ -296,10 +339,28 @@ const App: React.FC = () => {
   });
   const [importStatus, setImportStatus] = useState<ImportStatus>({ state: 'idle' });
   const [isImporterOpen, setIsImporterOpen] = useState(false);
+  const [pathAssignments, setPathAssignments] = useState<Record<SkillPath['id'], PathAssignments>>(
+    () => buildInitialAssignmentMap()
+  );
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [draggedCourseId, setDraggedCourseId] = useState<string | null>(null);
+  const [activeDropZone, setActiveDropZone] = useState<YearBucket | 'pool' | null>(null);
+  const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('counselor_setup_step_ids');
+      return stored ? (JSON.parse(stored) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
   
   useEffect(() => {
     localStorage.setItem('unpassed_exam_course_ids', JSON.stringify(unpassedExamCourseIds));
   }, [unpassedExamCourseIds]);
+
+  useEffect(() => {
+    localStorage.setItem('counselor_setup_step_ids', JSON.stringify(completedSetupStepIds));
+  }, [completedSetupStepIds]);
 
   const courseById = useMemo(
     () => new Map<string, HighSchoolCourse>(ALL_COURSES.map((course) => [course.id, course])),
@@ -308,6 +369,30 @@ const App: React.FC = () => {
 
   const getCourse = (id: string) => courseById.get(id);
   const selectedPath = useMemo(() => SKILL_PATHS.find((p) => p.id === selectedPathId)!, [selectedPathId]);
+  const selectedAssignments = useMemo(
+    () => pathAssignments[selectedPathId] ?? buildInitialAssignments(selectedPath),
+    [pathAssignments, selectedPathId, selectedPath]
+  );
+  const requiredCourseIds = useMemo(
+    () =>
+      new Set([
+        ...selectedPath.schedule.grade10,
+        ...selectedPath.schedule.grade11,
+        ...selectedPath.schedule.grade12,
+      ]),
+    [selectedPath]
+  );
+  const assignedCourseIds = useMemo(
+    () => Array.from(new Set([...selectedAssignments.grade10, ...selectedAssignments.grade11, ...selectedAssignments.grade12])),
+    [selectedAssignments]
+  );
+  const assignedCourses = useMemo(
+    () =>
+      assignedCourseIds
+        .map((id) => courseById.get(id))
+        .filter((course): course is HighSchoolCourse => Boolean(course)),
+    [assignedCourseIds, courseById]
+  );
 
   const plannedCourseIds = useMemo(
     () =>
@@ -403,16 +488,194 @@ const App: React.FC = () => {
   }, [plannedCourses, unpassedExamIdSet]);
 
   const uniqueCourseCount = plannedCourses.length;
-  const uniqueRecommendedElectiveIds = useMemo(
-    () => Array.from(new Set(selectedPath.recommendedElectives)),
-    [selectedPath]
+  const completedSetupCount = completedSetupStepIds.length;
+  const isAllCoursesAssigned = selectedAssignments.pool.length === 0;
+
+  const assignedProgress = useMemo(() => {
+    const satisfied = new Set<GenEdCategory>();
+    let total = 0;
+    let residency = 0;
+
+    assignedCourses.forEach((course) => {
+      const courseTotal = course.wsuEquivalent.reduce((acc, eq) => acc + eq.credits, 0);
+      const isExamBasedCredit = isExamBasedCourse(course);
+      const canCountCredits = !isExamBasedCredit || !unpassedExamIdSet.has(course.id);
+
+      if (!canCountCredits) return;
+
+      if (course.genEdCategory) satisfied.add(course.genEdCategory);
+      total += courseTotal;
+      if (course.type === 'CE') residency += courseTotal;
+    });
+
+    const missingCategories = REQUIRED_CATEGORIES.filter((cat) => !satisfied.has(cat));
+    return { satisfiedCategories: satisfied, missingCategories, totalCredits: total, residencyCredits: residency };
+  }, [assignedCourses, unpassedExamIdSet]);
+
+  const requiredCoursesInPool = useMemo(
+    () => selectedAssignments.pool.filter((id) => requiredCourseIds.has(id)),
+    [selectedAssignments.pool, requiredCourseIds]
   );
+
+  const talkingPoints = useMemo(() => {
+    const points: string[] = [];
+    if (assignedProgress.totalCredits < 60) {
+      points.push(`Current assigned plan is ${assignedProgress.totalCredits}/60 credits. Discuss where to place the remaining credits.`);
+    } else {
+      points.push(`Assigned plan currently meets the 60-credit target (${assignedProgress.totalCredits}).`);
+    }
+    if (assignedProgress.residencyCredits < 20) {
+      points.push(`Residency is ${assignedProgress.residencyCredits}/20. Identify CE options to close the gap.`);
+    } else {
+      points.push(`Residency requirement is currently met (${assignedProgress.residencyCredits}/20).`);
+    }
+    if (assignedProgress.missingCategories.length > 0) {
+      points.push(`Gen Ed gaps to confirm with student/parent: ${assignedProgress.missingCategories.join(', ')}.`);
+    } else {
+      points.push('All Gen Ed categories are represented in assigned classes.');
+    }
+    if (apIbEarnedCredits < apIbPotentialCredits) {
+      points.push(`AP/IB exam follow-up: ${apIbEarnedCredits}/${apIbPotentialCredits} currently counting.`);
+    }
+    return points;
+  }, [assignedProgress, apIbEarnedCredits, apIbPotentialCredits]);
+
+  const parentPrepQuestions = useMemo(() => {
+    const questions = [
+      'Which classes are highest priority for this student this year, and why?',
+      'What is the backup option if a selected class is full or unavailable?',
+    ];
+
+    if (assignedProgress.totalCredits < 60) {
+      questions.push('Which additional courses should we add now to stay on track for 60 credits?');
+    }
+    if (assignedProgress.residencyCredits < 20) {
+      questions.push('Which CE classes should we prioritize to reach the 20-credit residency minimum?');
+    }
+    if (assignedProgress.missingCategories.length > 0) {
+      questions.push(`How will we cover these missing Gen Ed categories: ${assignedProgress.missingCategories.join(', ')}?`);
+    }
+
+    return questions;
+  }, [assignedProgress]);
+  const estimatedParentSavings = assignedProgress.totalCredits * ESTIMATED_TUITION_PER_CREDIT;
+
+  const getLeastLoadedYear = (): YearBucket => {
+    const buckets: Array<{ key: YearBucket; count: number }> = [
+      { key: 'grade10', count: selectedAssignments.grade10.length },
+      { key: 'grade11', count: selectedAssignments.grade11.length },
+      { key: 'grade12', count: selectedAssignments.grade12.length },
+    ];
+    buckets.sort((a, b) => a.count - b.count);
+    return buckets[0].key;
+  };
+
+  const getDefaultYearForRequiredCourse = (courseId: string): YearBucket => {
+    if (selectedPath.schedule.grade10.includes(courseId)) return 'grade10';
+    if (selectedPath.schedule.grade11.includes(courseId)) return 'grade11';
+    if (selectedPath.schedule.grade12.includes(courseId)) return 'grade12';
+    return getLeastLoadedYear();
+  };
+
+  const studentNextStep = useMemo(() => {
+    if (selectedAssignments.pool.length === 0) {
+      return null;
+    }
+
+    if (requiredCoursesInPool.length > 0) {
+      const courseId = requiredCoursesInPool[0];
+      return {
+        courseId,
+        targetYear: getDefaultYearForRequiredCourse(courseId),
+        reason: 'This is a required pathway course and should be placed back into the roadmap.',
+      };
+    }
+
+    for (const category of assignedProgress.missingCategories) {
+      const match = selectedAssignments.pool.find((id) => courseById.get(id)?.genEdCategory === category);
+      if (match) {
+        return {
+          courseId: match,
+          targetYear: getLeastLoadedYear(),
+          reason: `This helps cover missing Gen Ed category: ${category}.`,
+        };
+      }
+    }
+
+    if (assignedProgress.residencyCredits < 20) {
+      const ceMatch = selectedAssignments.pool.find((id) => courseById.get(id)?.type === 'CE');
+      if (ceMatch) {
+        return {
+          courseId: ceMatch,
+          targetYear: getLeastLoadedYear(),
+          reason: 'This helps close the CE residency-credit requirement.',
+        };
+      }
+    }
+
+    const highestCreditCourse = selectedAssignments.pool
+      .map((id) => courseById.get(id))
+      .filter((course): course is HighSchoolCourse => Boolean(course))
+      .sort((a, b) =>
+        b.wsuEquivalent.reduce((sum, eq) => sum + eq.credits, 0) -
+        a.wsuEquivalent.reduce((sum, eq) => sum + eq.credits, 0)
+      )[0];
+
+    if (!highestCreditCourse) return null;
+
+    return {
+      courseId: highestCreditCourse.id,
+      targetYear: getLeastLoadedYear(),
+      reason: 'This is the highest-credit option currently in the pool.',
+    };
+  }, [selectedAssignments.pool, requiredCoursesInPool, assignedProgress, selectedPath, courseById]);
 
   const handleToggleExamPassed = (courseId: string) => {
     setUnpassedExamCourseIds((current) =>
       current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
     );
   };
+
+  const handleToggleSetupStep = (stepId: string) => {
+    setCompletedSetupStepIds((current) =>
+      current.includes(stepId) ? current.filter((id) => id !== stepId) : [...current, stepId]
+    );
+  };
+
+  const assignCourseToBucket = (courseId: string, targetBucket: YearBucket | 'pool') => {
+    setPathAssignments((current) => {
+      const currentAssignments = current[selectedPathId] ?? buildInitialAssignments(selectedPath);
+      const nextAssignments: PathAssignments = {
+        grade10: currentAssignments.grade10.filter((id) => id !== courseId),
+        grade11: currentAssignments.grade11.filter((id) => id !== courseId),
+        grade12: currentAssignments.grade12.filter((id) => id !== courseId),
+        pool: currentAssignments.pool.filter((id) => id !== courseId),
+      };
+
+      if (targetBucket === 'grade10') nextAssignments.grade10.push(courseId);
+      if (targetBucket === 'grade11') nextAssignments.grade11.push(courseId);
+      if (targetBucket === 'grade12') nextAssignments.grade12.push(courseId);
+      if (targetBucket === 'pool') nextAssignments.pool.push(courseId);
+
+      return {
+        ...current,
+        [selectedPathId]: nextAssignments,
+      };
+    });
+  };
+
+  const handleDropToBucket = (targetBucket: YearBucket | 'pool') => {
+    if (!draggedCourseId) return;
+    assignCourseToBucket(draggedCourseId, targetBucket);
+    setActiveDropZone(null);
+    setDraggedCourseId(null);
+  };
+
+  useEffect(() => {
+    setSelectedCourseId(null);
+    setDraggedCourseId(null);
+    setActiveDropZone(null);
+  }, [selectedPathId]);
 
   const handleImportCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -475,11 +738,11 @@ const App: React.FC = () => {
       }, 0);
 
     return {
-      grade10: sumCredits(selectedPath.schedule.grade10),
-      grade11: sumCredits(selectedPath.schedule.grade11),
-      grade12: sumCredits(selectedPath.schedule.grade12),
+      grade10: sumCredits(selectedAssignments.grade10),
+      grade11: sumCredits(selectedAssignments.grade11),
+      grade12: sumCredits(selectedAssignments.grade12),
     };
-  }, [courseById, selectedPath, unpassedExamIdSet]);
+  }, [courseById, selectedAssignments, unpassedExamIdSet]);
 
   // Filter courses for catalog (exclude ones already in path or recommended)
   const groupedCatalog = useMemo(() => {
@@ -503,17 +766,48 @@ const App: React.FC = () => {
   }, [plannedCourseIds, searchTerm]);
 
 
-  const CourseCard: React.FC<{ course: HighSchoolCourse; compact?: boolean; showExamToggle?: boolean }> = ({
+  const CourseCard: React.FC<{
+    course: HighSchoolCourse;
+    compact?: boolean;
+    showExamToggle?: boolean;
+    draggable?: boolean;
+    isSelected?: boolean;
+    onSelect?: () => void;
+  }> = ({
     course,
     compact,
     showExamToggle = false,
+    draggable = false,
+    isSelected = false,
+    onSelect,
   }) => {
     const isResidency = course.type === 'CE';
     const isExamBasedCredit = isExamBasedCourse(course);
     const isExamPassed = !unpassedExamIdSet.has(course.id);
     
     return (
-      <div className={`bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden ${compact ? 'p-2' : 'p-3 mb-2'}`}>
+      <div
+        className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden ${
+          compact ? 'p-2' : 'p-3 mb-2'
+        } ${isSelected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200'} ${draggable ? 'cursor-move' : ''}`}
+        draggable={draggable}
+        onDragStart={() => {
+          if (!draggable) return;
+          setActiveDropZone(null);
+          setDraggedCourseId(course.id);
+        }}
+        onDragEnd={() => {
+          if (!draggable) return;
+          setDraggedCourseId(null);
+          setActiveDropZone(null);
+        }}
+        onClick={(event) => {
+          if (!onSelect) return;
+          const target = event.target as HTMLElement;
+          if (target.closest('label') || target.closest('input')) return;
+          onSelect();
+        }}
+      >
         <div className={`absolute top-0 right-0 px-2 py-0.5 text-[9px] font-bold uppercase rounded-bl-lg
           ${isResidency ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-700'}`}>
           {isResidency ? 'WSU CE' : course.type}
@@ -564,6 +858,9 @@ const App: React.FC = () => {
       </div>
     );
   };
+
+  const selectedCourse = selectedCourseId ? getCourse(selectedCourseId) : null;
+  const templateCsvUrl = `${import.meta.env.BASE_URL}school_planner_template.csv`;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-12">
@@ -679,7 +976,7 @@ const App: React.FC = () => {
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
 
         {/* SECTION 1: DEGREE REQUIREMENTS (TOP DASHBOARD) */}
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
+	        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
               <BookOpen className="w-5 h-5 mr-2 text-orange-600" />
               Degree Progress Dashboard
@@ -735,83 +1032,212 @@ const App: React.FC = () => {
 	            </div>
 	        </div>
 
-	        {/* SECTION 2: YEARLY ROADMAP */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
+        {/* SECTION: COUNSELOR ONBOARDING + PLAYBOOK */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor 20-Min Setup</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Follow this quick-start checklist to onboard a school counselor workflow.
+            </p>
+            <div className="text-xs text-gray-500 mb-3">
+              Progress: {completedSetupCount}/{COUNSELOR_SETUP_STEPS.length} complete
+            </div>
+            <div className="space-y-2">
+              {COUNSELOR_SETUP_STEPS.map((step) => {
+                const checked = completedSetupStepIds.includes(step.id);
+                return (
+                  <label key={step.id} className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-orange-600"
+                      checked={checked}
+                      onChange={() => handleToggleSetupStep(step.id)}
+                    />
+                    <span className={checked ? 'line-through text-gray-400' : ''}>{step.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Grade 10 */}
-            <div className="bg-white rounded-xl p-4 border-t-4 border-orange-400 shadow-sm flex flex-col h-full relative">
-              <div className="flex items-center mb-4 pb-2 border-b border-gray-100">
-                <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">10</div>
-                <h3 className="font-bold text-gray-800">Sophomore</h3>
-              </div>
-              <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
-                Total College Credit Hours: {yearlyCreditTotals.grade10}
-              </div>
-              <div className="space-y-2 flex-grow">
-                {selectedPath.schedule.grade10.map(id => {
-                  const c = getCourse(id);
-                  return c ? <CourseCard key={id} course={c} showExamToggle /> : null;
-                })}
-              </div>
-            </div>
 
-            {/* Grade 11 */}
-            <div className="bg-white rounded-xl p-4 border-t-4 border-orange-500 shadow-sm flex flex-col h-full">
-              <div className="flex items-center mb-4 pb-2 border-b border-gray-100">
-                <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">11</div>
-                <h3 className="font-bold text-gray-800">Junior</h3>
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Playbook Mode</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Use this meeting script when guiding students through signup.
+            </p>
+            <div className="space-y-3 text-sm">
+              <div className="bg-gray-50 border border-gray-200 rounded p-3">
+                <div className="font-semibold text-gray-900">Phase 1: Confirm Goals</div>
+                <div className="text-gray-600 mt-1">“Which pathway fits your post-high-school plan best?”</div>
               </div>
-              <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
-                Total College Credit Hours: {yearlyCreditTotals.grade11}
+              <div className="bg-gray-50 border border-gray-200 rounded p-3">
+                <div className="font-semibold text-gray-900">Phase 2: Build the Year Plan</div>
+                <div className="text-gray-600 mt-1">“Drag classes into Grade 10-12, then review credits and requirements.”</div>
               </div>
-              <div className="space-y-2 flex-grow">
-                {selectedPath.schedule.grade11.map(id => {
-                   const c = getCourse(id);
-                   return c ? <CourseCard key={id} course={c} showExamToggle /> : null;
-                })}
-              </div>
-            </div>
-
-            {/* Grade 12 */}
-            <div className="bg-white rounded-xl p-4 border-t-4 border-orange-600 shadow-sm flex flex-col h-full">
-              <div className="flex items-center mb-4 pb-2 border-b border-gray-100">
-                <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">12</div>
-                <h3 className="font-bold text-gray-800">Senior</h3>
-              </div>
-              <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
-                Total College Credit Hours: {yearlyCreditTotals.grade12}
-              </div>
-              <div className="space-y-2 flex-grow">
-                {selectedPath.schedule.grade12.map(id => {
-                   const c = getCourse(id);
-                   return c ? <CourseCard key={id} course={c} showExamToggle /> : null;
-                })}
+              <div className="bg-gray-50 border border-gray-200 rounded p-3">
+                <div className="font-semibold text-gray-900">Phase 3: Family Readiness</div>
+                <div className="text-gray-600 mt-1">“Review parent questions, savings estimate, and next recommended course.”</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* SECTION 3: ADDITIONS & GEN ED CHECKLIST */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+	        {/* SECTION 2: YEARLY ROADMAP */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
+          </div>
+
+          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            <div className="text-xs text-blue-900 font-semibold mb-2">Drag tiles between years or select a tile then assign:</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-blue-800">
+                {selectedCourse ? `Selected: ${selectedCourse.name}` : 'No tile selected'}
+              </span>
+              <button
+                disabled={!selectedCourseId}
+                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade10')}
+                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+              >
+                Assign to 10
+              </button>
+              <button
+                disabled={!selectedCourseId}
+                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade11')}
+                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+              >
+                Assign to 11
+              </button>
+              <button
+                disabled={!selectedCourseId}
+                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade12')}
+                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+              >
+                Assign to 12
+              </button>
+              <button
+                disabled={!selectedCourseId}
+                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'pool')}
+                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+              >
+                Move to Pool
+              </button>
+            </div>
+          </div>
           
-          {/* Recommended Additions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                key: 'grade10' as YearBucket,
+                label: 'Sophomore',
+                badge: '10',
+                borderClass: 'border-orange-400',
+                credits: yearlyCreditTotals.grade10,
+              },
+              {
+                key: 'grade11' as YearBucket,
+                label: 'Junior',
+                badge: '11',
+                borderClass: 'border-orange-500',
+                credits: yearlyCreditTotals.grade11,
+              },
+              {
+                key: 'grade12' as YearBucket,
+                label: 'Senior',
+                badge: '12',
+                borderClass: 'border-orange-600',
+                credits: yearlyCreditTotals.grade12,
+              },
+            ].map((year) => (
+              <div key={year.key} className={`bg-white rounded-xl p-4 border-t-4 ${year.borderClass} shadow-sm flex flex-col h-full relative`}>
+                <div className="flex items-center mb-4 pb-2 border-b border-gray-100">
+                  <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">{year.badge}</div>
+                  <h3 className="font-bold text-gray-800">{year.label}</h3>
+                </div>
+                <div className="mb-3 text-xs font-semibold text-gray-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
+                  Total College Credit Hours: {year.credits}
+                </div>
+                <div
+                  className={`space-y-2 flex-grow min-h-[200px] rounded-lg border-2 border-dashed p-2 transition-colors ${
+                    activeDropZone === year.key ? 'border-blue-300 bg-blue-50/40' : 'border-transparent'
+                  }`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setActiveDropZone(year.key);
+                  }}
+                  onDragLeave={() => {
+                    setActiveDropZone((current) => (current === year.key ? null : current));
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleDropToBucket(year.key);
+                  }}
+                >
+                  {selectedAssignments[year.key].map((id) => {
+                    const course = getCourse(id);
+                    return course ? (
+                      <CourseCard
+                        key={id}
+                        course={course}
+                        showExamToggle
+                        draggable
+                        isSelected={selectedCourseId === id}
+                        onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
+                      />
+                    ) : null;
+                  })}
+                  {selectedAssignments[year.key].length === 0 && (
+                    <div className="text-xs text-gray-400 italic p-2">Drop courses here</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* SECTION 3: ADDITIONS & GEN ED CHECKLIST */}
+	        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Course Pool */}
           <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center">
                   <Plus className="w-5 h-5 mr-2 text-orange-600" />
-                  Recommended Additions
+                  Course Pool (Drag Into Years)
                 </h3>
               </div>
-	              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-grow">
-	                {uniqueRecommendedElectiveIds.map(id => {
-	                   const c = getCourse(id);
-	                   return c ? <CourseCard key={id} course={c} /> : null;
-	                })}
-	              </div>
+		              <div
+                    className={`p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-grow min-h-[240px] rounded-b-xl border-2 border-dashed transition-colors ${
+                      activeDropZone === 'pool' ? 'border-blue-300 bg-blue-50/40' : 'border-transparent'
+                    }`}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setActiveDropZone('pool');
+                    }}
+                    onDragLeave={() => {
+                      setActiveDropZone((current) => (current === 'pool' ? null : current));
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      handleDropToBucket('pool');
+                    }}
+                  >
+		                {selectedAssignments.pool.map((id) => {
+		                   const course = getCourse(id);
+		                   return course ? (
+                       <CourseCard
+                         key={id}
+                         course={course}
+                         draggable
+                         isSelected={selectedCourseId === id}
+                         onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
+                       />
+                     ) : null;
+		                })}
+                    {selectedAssignments.pool.length === 0 && (
+                      <div className="text-xs text-gray-400 italic p-2 col-span-full">No courses in pool. Drag a course here to unschedule it.</div>
+                    )}
+		              </div>
           </div>
 
           {/* Gen Ed Requirements Grid - COMPACT */}
@@ -842,10 +1268,90 @@ const App: React.FC = () => {
                 </div>
              )}
           </div>
+	        </div>
+
+        {/* SECTION: PARENT + STUDENT STICKY FEATURES */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Parent Meeting Prep</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Use this prep card before counselor meetings.
+            </p>
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-3 mb-4">
+              <div className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Estimated College Savings</div>
+              <div className="text-2xl font-black text-emerald-800 mt-1">
+                ${estimatedParentSavings.toLocaleString()}
+              </div>
+              <div className="text-xs text-emerald-700 mt-1">
+                Based on assigned credits ({assignedProgress.totalCredits}) x ${ESTIMATED_TUITION_PER_CREDIT}/credit.
+              </div>
+            </div>
+            <div className="space-y-2">
+              {parentPrepQuestions.map((question) => (
+                <div key={question} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
+                  {question}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Student Next-Step Recommender</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Suggest one high-impact move to keep signup momentum.
+            </p>
+
+            {studentNextStep ? (
+              <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                  <div className="text-sm font-semibold text-blue-900">
+                    Suggested Course: {getCourse(studentNextStep.courseId)?.name ?? studentNextStep.courseId}
+                  </div>
+                  <div className="text-xs text-blue-800 mt-1">{studentNextStep.reason}</div>
+                  <div className="text-xs text-blue-700 mt-1">
+                    Recommended placement: {YEAR_LABELS[studentNextStep.targetYear]}
+                  </div>
+                </div>
+                <button
+                  onClick={() => assignCourseToBucket(studentNextStep.courseId, studentNextStep.targetYear)}
+                  className="text-sm rounded bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 font-semibold"
+                >
+                  Apply Recommendation
+                </button>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded p-3">
+                No immediate recommendation. All pool courses have been placed.
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* SECTION 4: FULL CATALOG - GROUPED */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200">
+        {/* SECTION: COUNSELOR TALKING POINTS */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Talking Points</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Generated discussion points for student signup meetings.
+          </p>
+
+          {isAllCoursesAssigned ? (
+            <div className="space-y-2">
+              {talkingPoints.map((point) => (
+                <div key={point} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
+                  {point}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
+              Assign all classes from the pool to Grade 10-12 to unlock final counselor talking points.
+              <div className="text-xs mt-1">Remaining in pool: {selectedAssignments.pool.length}</div>
+            </div>
+          )}
+        </div>
+
+	        {/* SECTION 4: FULL CATALOG - GROUPED */}
+	        <div className="bg-white rounded-xl shadow-md border border-gray-200">
            <button 
              onClick={() => setShowFullCatalog(!showFullCatalog)}
              className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
@@ -961,7 +1467,7 @@ const App: React.FC = () => {
                 <label className="block text-sm font-semibold text-blue-900 mb-2">Try an Admin CSV Upload</label>
                 <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <a
-                    href="/school_planner_template.csv"
+                    href={templateCsvUrl}
                     download
                     className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition-colors"
                   >
