@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
@@ -295,6 +295,7 @@ const App: React.FC = () => {
     }
   });
   const [importStatus, setImportStatus] = useState<ImportStatus>({ state: 'idle' });
+  const [isImporterOpen, setIsImporterOpen] = useState(false);
   
   useEffect(() => {
     localStorage.setItem('unpassed_exam_course_ids', JSON.stringify(unpassedExamCourseIds));
@@ -619,6 +620,15 @@ const App: React.FC = () => {
 	                        <li>1 Cultural Competence course (*)</li>
 	                      </ul>
 	                   </Tooltip>
+
+                     <button
+                       onClick={() => setIsImporterOpen(true)}
+                       className="flex items-center space-x-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-100 px-3 py-2 rounded-lg transition-colors text-sm font-medium border border-blue-300/30"
+                       title="Open School Importer Prototype"
+                     >
+                       <Upload className="w-4 h-4" />
+                       <span>Importer</span>
+                     </button>
                 </div>
             </div>
 
@@ -667,67 +677,6 @@ const App: React.FC = () => {
       </div>
 
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
-
-        {/* SECTION: SCHOOL IMPORTER PITCH */}
-        <div className="bg-white rounded-xl shadow-md border border-blue-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 px-6 py-4">
-            <h2 className="text-lg font-bold text-blue-900 flex items-center">
-              <Upload className="w-5 h-5 mr-2" />
-              School Importer (Prototype)
-            </h2>
-            <p className="text-sm text-blue-800 mt-1">
-              Bring one CSV and this same planner can be swapped to your school&apos;s classes and pathways.
-            </p>
-          </div>
-
-          <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                Sales pitch flow: admin uploads one sheet, we validate required fields, then publish a school-branded planning site.
-              </p>
-              <div className="mt-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Required CSV columns</div>
-                <div className="flex flex-wrap gap-2">
-                  {REQUIRED_IMPORT_COLUMNS.map((column) => (
-                    <span key={column} className="text-[11px] px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-700">
-                      {column}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
-              <label className="block text-sm font-semibold text-blue-900 mb-2">Try an Admin CSV Upload</label>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleImportCsv}
-                className="block w-full text-sm text-gray-700 file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Use `school_planner_template.csv` from the onboarding generator to demo the flow.
-              </p>
-
-              {importStatus.state === 'ok' && (
-                <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-                  <div className="font-semibold">CSV ready for onboarding</div>
-                  <div>{importStatus.fileName} • {importStatus.rowCount} rows detected</div>
-                </div>
-              )}
-
-              {importStatus.state === 'error' && (
-                <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                  <div className="font-semibold">{importStatus.message}</div>
-                  <div className="text-xs mt-1">{importStatus.fileName}</div>
-                  {importStatus.missing && importStatus.missing.length > 0 && (
-                    <div className="text-xs mt-1">Missing: {importStatus.missing.join(', ')}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* SECTION 1: DEGREE REQUIREMENTS (TOP DASHBOARD) */}
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
@@ -963,6 +912,94 @@ const App: React.FC = () => {
         </div>
 
       </div>
+
+      {isImporterOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            className="absolute inset-0 bg-slate-950/70"
+            onClick={() => setIsImporterOpen(false)}
+            aria-label="Close importer modal"
+          />
+          <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl border border-blue-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 px-6 py-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-blue-900 flex items-center">
+                  <Upload className="w-5 h-5 mr-2" />
+                  School Importer (Prototype)
+                </h2>
+                <p className="text-sm text-blue-800 mt-1">
+                  Bring one CSV and this same planner can be swapped to your school&apos;s classes and pathways.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsImporterOpen(false)}
+                className="text-slate-500 hover:text-slate-800 p-1 rounded"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Sales pitch flow: admin uploads one sheet, we validate required fields, then publish a school-branded planning site.
+                </p>
+                <div className="mt-4">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Required CSV columns</div>
+                  <div className="flex flex-wrap gap-2">
+                    {REQUIRED_IMPORT_COLUMNS.map((column) => (
+                      <span key={column} className="text-[11px] px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-700">
+                        {column}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
+                <label className="block text-sm font-semibold text-blue-900 mb-2">Try an Admin CSV Upload</label>
+                <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                  <a
+                    href="/school_planner_template.csv"
+                    download
+                    className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Template CSV
+                  </a>
+                </div>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleImportCsv}
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Use <span className="font-mono">school_planner_template.csv</span> for a working demo upload.
+                </p>
+
+                {importStatus.state === 'ok' && (
+                  <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                    <div className="font-semibold">CSV ready for onboarding</div>
+                    <div>{importStatus.fileName} • {importStatus.rowCount} rows detected</div>
+                  </div>
+                )}
+
+                {importStatus.state === 'error' && (
+                  <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <div className="font-semibold">{importStatus.message}</div>
+                    <div className="text-xs mt-1">{importStatus.fileName}</div>
+                    {importStatus.missing && importStatus.missing.length > 0 && (
+                      <div className="text-xs mt-1">Missing: {importStatus.missing.join(', ')}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
