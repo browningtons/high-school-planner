@@ -671,6 +671,16 @@ const App: React.FC = () => {
     setDraggedCourseId(null);
   };
 
+  const handleResetPathAssignments = () => {
+    setPathAssignments((current) => ({
+      ...current,
+      [selectedPathId]: buildInitialAssignments(selectedPath),
+    }));
+    setSelectedCourseId(null);
+    setDraggedCourseId(null);
+    setActiveDropZone(null);
+  };
+
   useEffect(() => {
     setSelectedCourseId(null);
     setDraggedCourseId(null);
@@ -861,6 +871,7 @@ const App: React.FC = () => {
 
   const selectedCourse = selectedCourseId ? getCourse(selectedCourseId) : null;
   const templateCsvUrl = `${import.meta.env.BASE_URL}school_planner_template.csv`;
+  const dataDictionaryCsvUrl = `${import.meta.env.BASE_URL}data_dictionary.csv`;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-12">
@@ -1035,7 +1046,7 @@ const App: React.FC = () => {
         {/* SECTION: COUNSELOR ONBOARDING + PLAYBOOK */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor 20-Min Setup</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Quick Start (20 Minutes)</h3>
             <p className="text-sm text-gray-600 mb-4">
               Follow this quick-start checklist to onboard a school counselor workflow.
             </p>
@@ -1061,7 +1072,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Playbook Mode</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Playbook</h3>
             <p className="text-sm text-gray-600 mb-4">
               Use this meeting script when guiding students through signup.
             </p>
@@ -1082,14 +1093,27 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        <div className="bg-slate-900 rounded-xl shadow-md border border-slate-800 px-5 py-4 text-white">
+          <div className="text-sm font-semibold text-orange-300 uppercase tracking-wider">Implementation Promise</div>
+          <div className="mt-1 text-sm text-slate-200">
+            Provide your two CSV files and we can configure a school-branded version of this planner in 48 hours.
+          </div>
+        </div>
+
 	        {/* SECTION 2: YEARLY ROADMAP */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
+            <button
+              onClick={handleResetPathAssignments}
+              className="text-xs sm:text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 font-semibold text-gray-700"
+            >
+              Reset to Path Default
+            </button>
           </div>
 
           <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-            <div className="text-xs text-blue-900 font-semibold mb-2">Drag tiles between years or select a tile then assign:</div>
+            <div className="text-xs text-blue-900 font-semibold mb-2">Drag tiles between years, or on mobile tap a tile then use assign buttons:</div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-blue-800">
                 {selectedCourse ? `Selected: ${selectedCourse.name}` : 'No tile selected'}
@@ -1097,28 +1121,28 @@ const App: React.FC = () => {
               <button
                 disabled={!selectedCourseId}
                 onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade10')}
-                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
               >
                 Assign to 10
               </button>
               <button
                 disabled={!selectedCourseId}
                 onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade11')}
-                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
               >
                 Assign to 11
               </button>
               <button
                 disabled={!selectedCourseId}
                 onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade12')}
-                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
               >
                 Assign to 12
               </button>
               <button
                 disabled={!selectedCourseId}
                 onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'pool')}
-                className="text-xs rounded px-2 py-1 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
+                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
               >
                 Move to Pool
               </button>
@@ -1203,7 +1227,7 @@ const App: React.FC = () => {
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center">
                   <Plus className="w-5 h-5 mr-2 text-orange-600" />
-                  Course Pool (Drag Into Years)
+                  Course Pool (Unassigned / Optional)
                 </h3>
               </div>
 		              <div
@@ -1474,7 +1498,18 @@ const App: React.FC = () => {
                     <Download className="w-4 h-4" />
                     Download Template CSV
                   </a>
+                  <a
+                    href={dataDictionaryCsvUrl}
+                    download
+                    className="inline-flex items-center justify-center gap-2 rounded bg-white text-slate-800 border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Data Dictionary
+                  </a>
                 </div>
+                <p className="text-xs text-gray-600 mb-3">
+                  Handoff for schools: send us both files and we will configure your school version.
+                </p>
                 <input
                   type="file"
                   accept=".csv,text/csv"
