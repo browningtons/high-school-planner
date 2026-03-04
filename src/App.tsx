@@ -57,6 +57,21 @@ interface Counselor {
   assignment?: string; // e.g. "A-Di"
 }
 
+interface ImporterFlowStage {
+  title: string;
+  detail: string;
+  hint: string;
+  icon: React.ElementType;
+}
+
+interface ImporterPathwayRoleCard {
+  pathway: string;
+  csvSignal: string;
+  classes: string;
+  roles: string;
+  toneClass: string;
+}
+
 // --- DATA BASED ON PDF CONTENT ---
 
 const COUNSELORS: Counselor[] = [
@@ -223,6 +238,58 @@ const REQUIRED_IMPORT_COLUMNS = [
   'placement',
 ];
 
+const IMPORTER_FLOW_STAGES: ImporterFlowStage[] = [
+  {
+    title: '1. CSV Rows',
+    detail: 'Each row represents one class placement for a pathway and grade level.',
+    hint: 'Key fields: pathway_code, course_code, year_level, placement',
+    icon: Upload,
+  },
+  {
+    title: '2. Planner Build',
+    detail: 'The importer groups rows into pathway plans and class sequences.',
+    hint: 'Output: required vs elective placement by grade',
+    icon: School,
+  },
+  {
+    title: '3. Counselor View',
+    detail: 'Counselors use the plan to guide family meetings and schedule choices.',
+    hint: 'Output: credits, categories, and career talking points',
+    icon: Briefcase,
+  },
+];
+
+const IMPORTER_PATHWAY_ROLE_CARDS: ImporterPathwayRoleCard[] = [
+  {
+    pathway: 'Technology & Engineering',
+    csvSignal: 'pathway_code = tech',
+    classes: 'CS 1400, AP Calc AB, AP Physics',
+    roles: 'Software Developer, Design Engineer',
+    toneClass: 'border-sky-200 bg-sky-50',
+  },
+  {
+    pathway: 'Health Sciences',
+    csvSignal: 'pathway_code = health',
+    classes: 'HTHS 1104, AP Biology, RHS 2300',
+    roles: 'Nurse, EMS, Medical Assistant',
+    toneClass: 'border-emerald-200 bg-emerald-50',
+  },
+  {
+    pathway: 'Business & Humanities',
+    csvSignal: 'pathway_code = business',
+    classes: 'BSAD 1010, ENTR 1000, CE Comm 2110',
+    roles: 'Entrepreneur, Project Coordinator',
+    toneClass: 'border-amber-200 bg-amber-50',
+  },
+  {
+    pathway: 'Social Studies & Law',
+    csvSignal: 'pathway_code = social',
+    classes: 'AP US Hist, CE CJ 1010, AP US Gov',
+    roles: 'Public Service, Legal Support',
+    toneClass: 'border-teal-200 bg-teal-50',
+  },
+];
+
 const IMPORTER_QUICK_START_STEPS = [
   {
     title: 'Download the template',
@@ -240,7 +307,7 @@ const IMPORTER_QUICK_START_STEPS = [
 
 const IMPORTER_TROUBLESHOOTING_TIPS = [
   'If clicking seems unresponsive, click once and wait 2 seconds before trying again.',
-  'If your mouse is not responding, try a trackpad or replace mouse batteries.',
+  'If this feels like schedule-change week, take a breath, save once, and re-upload once.',
   'If upload fails, re-download the template and copy your data into it before retrying.',
 ];
 
@@ -1491,8 +1558,50 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
+            <div className="p-6 space-y-6">
+              <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-4">
+                <h3 className="text-sm font-semibold text-slate-900">What these CSVs are actually doing</h3>
+                <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                  Think of this as a data org chart: class rows become pathway plans, and pathway plans become counselor-ready student roadmaps.
+                </p>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {IMPORTER_FLOW_STAGES.map((stage) => {
+                    const StageIcon = stage.icon;
+                    return (
+                      <div key={stage.title} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="flex items-center gap-2">
+                          <StageIcon className="w-4 h-4 text-blue-700" />
+                          <h4 className="text-sm font-semibold text-slate-900">{stage.title}</h4>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-2 leading-relaxed">{stage.detail}</p>
+                        <p className="text-[11px] text-slate-500 mt-2">{stage.hint}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Pathway to role examples</div>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {IMPORTER_PATHWAY_ROLE_CARDS.map((card) => (
+                      <div key={card.pathway} className={`rounded-lg border p-3 ${card.toneClass}`}>
+                        <div className="text-xs font-semibold text-slate-900">{card.pathway}</div>
+                        <div className="text-[11px] font-mono text-slate-600 mt-1">{card.csvSignal}</div>
+                        <div className="text-xs text-slate-700 mt-2">
+                          <span className="font-semibold">Classes:</span> {card.classes}
+                        </div>
+                        <div className="text-xs text-slate-700 mt-1">
+                          <span className="font-semibold">Roles:</span> {card.roles}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <h3 className="text-sm font-semibold text-slate-900">Admin Quick Start (about 5 minutes)</h3>
                   <ol className="mt-3 space-y-3">
@@ -1523,9 +1632,9 @@ const App: React.FC = () => {
                     You do not need to memorize these fields. The template already includes them.
                   </p>
                 </div>
-              </div>
+                </div>
 
-              <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
+                <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
                 <label className="block text-sm font-semibold text-blue-900 mb-2">Step 3: Upload your completed CSV</label>
                 <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <a
@@ -1591,6 +1700,7 @@ const App: React.FC = () => {
                       <li key={tip} className="leading-relaxed">{tip}</li>
                     ))}
                   </ul>
+                </div>
                 </div>
               </div>
             </div>
