@@ -1543,10 +1543,10 @@ const App: React.FC = () => {
               <div>
                 <h2 className="text-lg font-bold text-blue-900 flex items-center">
                   <Upload className="w-5 h-5 mr-2" />
-                  School Importer (Prototype)
+                  School Importer
                 </h2>
                 <p className="text-sm text-blue-800 mt-1">
-                  This walks your team through one CSV upload so we can configure the planner for your school.
+                  Counselor Mode: a step-by-step upload flow for non-technical school staff.
                 </p>
               </div>
               <button
@@ -1559,150 +1559,181 @@ const App: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-4">
-                <h3 className="text-sm font-semibold text-slate-900">What these CSVs are actually doing</h3>
-                <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                  Think of this as a data org chart: class rows become pathway plans, and pathway plans become counselor-ready student roadmaps.
-                </p>
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {IMPORTER_FLOW_STAGES.map((stage) => {
-                    const StageIcon = stage.icon;
-                    return (
-                      <div key={stage.title} className="rounded-lg border border-slate-200 bg-white p-3">
-                        <div className="flex items-center gap-2">
-                          <StageIcon className="w-4 h-4 text-blue-700" />
-                          <h4 className="text-sm font-semibold text-slate-900">{stage.title}</h4>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-2 leading-relaxed">{stage.detail}</p>
-                        <p className="text-[11px] text-slate-500 mt-2">{stage.hint}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Pathway to role examples</div>
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {IMPORTER_PATHWAY_ROLE_CARDS.map((card) => (
-                      <div key={card.pathway} className={`rounded-lg border p-3 ${card.toneClass}`}>
-                        <div className="text-xs font-semibold text-slate-900">{card.pathway}</div>
-                        <div className="text-[11px] font-mono text-slate-600 mt-1">{card.csvSignal}</div>
-                        <div className="text-xs text-slate-700 mt-2">
-                          <span className="font-semibold">Classes:</span> {card.classes}
-                        </div>
-                        <div className="text-xs text-slate-700 mt-1">
-                          <span className="font-semibold">Roles:</span> {card.roles}
-                        </div>
-                      </div>
-                    ))}
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Start Here (about 5 minutes)</h3>
+                    <p className="text-sm text-slate-600 mt-1">Follow these steps in order. The template does the technical setup for you.</p>
                   </div>
+                  <span className="inline-flex items-center rounded-full border border-blue-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-blue-700">
+                    Counselor Mode
+                  </span>
                 </div>
+                <ol className="mt-4 space-y-3">
+                  {IMPORTER_QUICK_START_STEPS.map((step, index) => (
+                    <li key={step.title} className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{step.title}</div>
+                        <div className="text-sm text-slate-600">{step.detail}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="text-sm font-semibold text-slate-900">Admin Quick Start (about 5 minutes)</h3>
-                  <ol className="mt-3 space-y-3">
-                    {IMPORTER_QUICK_START_STEPS.map((step, index) => (
-                      <li key={step.title} className="flex items-start gap-3">
-                        <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-900">{step.title}</div>
-                          <div className="text-sm text-slate-600">{step.detail}</div>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-amber-800 mb-2">System checks these columns automatically</div>
-                  <div className="flex flex-wrap gap-2">
-                    {REQUIRED_IMPORT_COLUMNS.map((column) => (
-                      <span key={column} className="text-[11px] px-2 py-1 rounded border border-amber-200 bg-white text-amber-900">
-                        {column}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-amber-800 mt-3">
-                    You do not need to memorize these fields. The template already includes them.
-                  </p>
-                </div>
-                </div>
-
                 <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
-                <label className="block text-sm font-semibold text-blue-900 mb-2">Step 3: Upload your completed CSV</label>
-                <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                  <a
-                    href={templateCsvUrl}
-                    download
-                    className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Step 1: Download Template
-                  </a>
-                  <a
-                    href={dataDictionaryCsvUrl}
-                    download
-                    className="inline-flex items-center justify-center gap-2 rounded bg-white text-slate-800 border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Step 2: Data Dictionary
-                  </a>
-                </div>
-                <p className="text-xs text-gray-600 mb-3">
-                  Keep both files together. They help your implementation team review and configure your school version faster.
-                </p>
-                <label htmlFor="admin-csv-upload" className="block text-sm font-semibold text-slate-800 mb-2">
-                  Choose your CSV file
-                </label>
-                <input
-                  id="admin-csv-upload"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleImportCsv}
-                  className="block w-full text-sm text-gray-700 file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Upload <span className="font-mono">school_planner_template.csv</span> first if this is your first time.
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  If the file picker resets to "No file chosen," that is expected after validation.
-                </p>
-
-                {importStatus.state === 'ok' && (
-                  <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-                    <div className="font-semibold">Success: CSV ready for onboarding</div>
-                    <div>{importStatus.fileName} • {importStatus.rowCount} rows detected</div>
+                  <label className="block text-sm font-semibold text-blue-900 mb-2">Upload your completed CSV</label>
+                  <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                    <a
+                      href={templateCsvUrl}
+                      download
+                      className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Step 1: Download Template
+                    </a>
+                    <a
+                      href={dataDictionaryCsvUrl}
+                      download
+                      className="inline-flex items-center justify-center gap-2 rounded bg-white text-slate-700 border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Optional: Data Dictionary
+                    </a>
                   </div>
-                )}
+                  <p className="text-xs text-gray-600 mb-3">
+                    The template is required. The data dictionary is a reference sheet for field definitions.
+                  </p>
+                  <label htmlFor="admin-csv-upload" className="block text-sm font-semibold text-slate-800 mb-2">
+                    Choose your CSV file
+                  </label>
+                  <input
+                    id="admin-csv-upload"
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleImportCsv}
+                    className="block w-full text-sm text-gray-700 file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Upload <span className="font-mono">school_planner_template.csv</span> first if this is your first time.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    If the file picker resets to "No file chosen," that is expected after validation.
+                  </p>
 
-                {importStatus.state === 'error' && (
-                  <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                    <div className="font-semibold">We could not validate this file yet.</div>
-                    <div className="mt-1">{importStatus.message}</div>
-                    <div className="text-xs mt-1">{importStatus.fileName}</div>
-                    {importStatus.missing && importStatus.missing.length > 0 && (
-                      <div className="text-xs mt-1">Missing: {importStatus.missing.join(', ')}</div>
-                    )}
-                    <div className="text-xs mt-2">Tip: Start from the template file and re-upload after saving as CSV.</div>
-                  </div>
-                )}
+                  {importStatus.state === 'ok' && (
+                    <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                      <div className="font-semibold">Success: CSV ready for onboarding</div>
+                      <div>{importStatus.fileName} • {importStatus.rowCount} rows detected</div>
+                      <div className="text-xs mt-2">
+                        Next step: send this validated CSV and the data dictionary to your implementation contact.
+                      </div>
+                    </div>
+                  )}
 
-                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Need help with basics?</div>
-                  <ul className="mt-2 space-y-1 text-xs text-slate-600 list-disc list-inside">
-                    {IMPORTER_TROUBLESHOOTING_TIPS.map((tip) => (
-                      <li key={tip} className="leading-relaxed">{tip}</li>
-                    ))}
-                  </ul>
+                  {importStatus.state === 'error' && (
+                    <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                      <div className="font-semibold">We could not validate this file yet.</div>
+                      <div className="mt-1">{importStatus.message}</div>
+                      <div className="text-xs mt-1">{importStatus.fileName}</div>
+                      {importStatus.missing && importStatus.missing.length > 0 && (
+                        <div className="text-xs mt-1">Missing: {importStatus.missing.join(', ')}</div>
+                      )}
+                      <div className="text-xs mt-2">Tip: Start from the template file and re-upload after saving as CSV.</div>
+                    </div>
+                  )}
                 </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <h4 className="text-sm font-semibold text-slate-900">What one row becomes</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      One class row in the CSV turns into one class recommendation in a counselor-facing pathway plan.
+                    </p>
+                    <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">CSV row</div>
+                      <div className="text-xs font-mono text-slate-700 mt-1">pathway_code=health, course_code=HTHS_1104, year_level=11, placement=required</div>
+                    </div>
+                    <div className="text-center text-slate-400 text-xs mt-2">↓</div>
+                    <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">Planner result</div>
+                      <div className="text-xs text-slate-700 mt-1">Health Sciences pathway, Grade 11 required class, supports Nursing/EMS planning.</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Need help with basics?</div>
+                    <ul className="mt-2 space-y-1 text-xs text-slate-600 list-disc list-inside">
+                      {IMPORTER_TROUBLESHOOTING_TIPS.map((tip) => (
+                        <li key={tip} className="leading-relaxed">{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </div>
+
+              <details className="rounded-lg border border-slate-200 bg-white">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900">
+                  Learn more (advanced): field names, pathway maps, and role examples
+                </summary>
+                <div className="border-t border-slate-100 p-4 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">What these CSVs are actually doing</h4>
+                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                      Class rows become pathway plans, and pathway plans become counselor-ready student roadmaps.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {IMPORTER_FLOW_STAGES.map((stage) => {
+                      const StageIcon = stage.icon;
+                      return (
+                        <div key={stage.title} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex items-center gap-2">
+                            <StageIcon className="w-4 h-4 text-blue-700" />
+                            <h5 className="text-sm font-semibold text-slate-900">{stage.title}</h5>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-2 leading-relaxed">{stage.detail}</p>
+                          <p className="text-[11px] text-slate-500 mt-2">{stage.hint}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">System checks these columns automatically</div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {REQUIRED_IMPORT_COLUMNS.map((column) => (
+                        <span key={column} className="text-[11px] px-2 py-1 rounded border border-amber-200 bg-amber-50 text-amber-900">
+                          {column}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Pathway to role examples</div>
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {IMPORTER_PATHWAY_ROLE_CARDS.map((card) => (
+                        <div key={card.pathway} className={`rounded-lg border p-3 ${card.toneClass}`}>
+                          <div className="text-xs font-semibold text-slate-900">{card.pathway}</div>
+                          <div className="text-[11px] font-mono text-slate-600 mt-1">{card.csvSignal}</div>
+                          <div className="text-xs text-slate-700 mt-2">
+                            <span className="font-semibold">Classes:</span> {card.classes}
+                          </div>
+                          <div className="text-xs text-slate-700 mt-1">
+                            <span className="font-semibold">Roles:</span> {card.roles}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         </div>
