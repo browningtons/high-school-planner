@@ -1630,7 +1630,27 @@ const App: React.FC = () => {
                       <div className="font-semibold">Success: CSV ready for onboarding</div>
                       <div>{importStatus.fileName} • {importStatus.rowCount} rows detected</div>
                       <div className="text-xs mt-2">
-                        Next step: send this validated CSV and the data dictionary to your implementation contact.
+                        Your file is valid. Next: send this validated CSV and the data dictionary to your implementation contact.
+                      </div>
+                      <div className="mt-3 rounded border border-blue-200 bg-white p-3 text-slate-800">
+                        <div className="text-sm font-semibold text-blue-900">Ready to launch this on your school website?</div>
+                        <p className="text-xs text-slate-600 mt-1">
+                          We can turn this validated data into a school-branded planner page for counselors, students, and families.
+                        </p>
+                        <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                          <a
+                            href="mailto:implementation@schoolplanner.app?subject=School%20Website%20Rollout%20Request"
+                            className="inline-flex items-center justify-center rounded bg-blue-700 text-white px-3 py-2 text-xs font-semibold hover:bg-blue-600 transition-colors"
+                          >
+                            Request Website Rollout
+                          </a>
+                          <a
+                            href="mailto:implementation@schoolplanner.app?subject=15-minute%20School%20Planner%20Setup%20Call"
+                            className="inline-flex items-center justify-center rounded border border-slate-300 bg-white text-slate-700 px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                          >
+                            Book 15-Min Setup Call
+                          </a>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1650,18 +1670,20 @@ const App: React.FC = () => {
 
                 <div className="space-y-4">
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <h4 className="text-sm font-semibold text-slate-900">What one row becomes</h4>
+                    <h4 className="text-sm font-semibold text-slate-900">Concrete example: one CSV row to counselor plan</h4>
                     <p className="text-xs text-slate-600 mt-1">
-                      One class row in the CSV turns into one class recommendation in a counselor-facing pathway plan.
+                      This CSV row becomes a Grade 11 required class in the Health pathway.
                     </p>
-                    <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">CSV row</div>
-                      <div className="text-xs font-mono text-slate-700 mt-1">pathway_code=health, course_code=HTHS_1104, year_level=11, placement=required</div>
-                    </div>
-                    <div className="text-center text-slate-400 text-xs mt-2">↓</div>
-                    <div className="rounded border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">Planner result</div>
-                      <div className="text-xs text-slate-700 mt-1">Health Sciences pathway, Grade 11 required class, supports Nursing/EMS planning.</div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                      <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">Before (CSV row)</div>
+                        <div className="text-xs font-mono text-slate-700 mt-1">pathway_code=health, course_code=HTHS_1104, year_level=11, placement=required</div>
+                      </div>
+                      <div className="text-center text-slate-400 text-xs font-semibold">to</div>
+                      <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">After (planner view)</div>
+                        <div className="text-xs text-slate-700 mt-1">Health Sciences pathway, Grade 11 required class, supports Nursing and EMS advising.</div>
+                      </div>
                     </div>
                   </div>
 
