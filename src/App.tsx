@@ -450,6 +450,17 @@ const App: React.FC = () => {
     localStorage.setItem('counselor_setup_step_ids', JSON.stringify(completedSetupStepIds));
   }, [completedSetupStepIds]);
 
+  useEffect(() => {
+    if (!isImporterOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isImporterOpen]);
+
   const courseById = useMemo(
     () => new Map<string, HighSchoolCourse>(ALL_COURSES.map((course) => [course.id, course])),
     []
@@ -1532,13 +1543,13 @@ const App: React.FC = () => {
       </div>
 
       {isImporterOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6">
           <button
             className="absolute inset-0 bg-slate-950/70"
             onClick={() => setIsImporterOpen(false)}
             aria-label="Close importer modal"
           />
-          <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl border border-blue-200 overflow-hidden">
+          <div className="relative mx-auto my-6 flex max-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-blue-200 bg-white shadow-2xl overscroll-contain">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 px-6 py-4 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold text-blue-900 flex items-center">
@@ -1558,7 +1569,7 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="overflow-y-auto p-6 space-y-6">
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
