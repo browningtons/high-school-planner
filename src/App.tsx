@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, Plus, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X } from 'lucide-react';
 
 // --- DATA STRUCTURES ---
 
@@ -70,6 +70,11 @@ interface ImporterPathwayRoleCard {
   classes: string;
   roles: string;
   toneClass: string;
+}
+
+interface ImportedPathwayOption {
+  code: string;
+  name: string;
 }
 
 // --- DATA BASED ON PDF CONTENT ---
@@ -238,6 +243,19 @@ const REQUIRED_IMPORT_COLUMNS = [
   'placement',
 ];
 
+const FREE_PREVIEW_ROW_LIMIT = 25;
+
+const IMPORTER_COLOR_SCHEMES = [
+  { id: 'classic-navy', label: 'Classic Navy', accentHex: '#1d4ed8', previewClass: 'border-blue-200 bg-blue-50' },
+  { id: 'forest', label: 'Forest', accentHex: '#15803d', previewClass: 'border-emerald-200 bg-emerald-50' },
+  { id: 'sunrise', label: 'Sunrise', accentHex: '#d97706', previewClass: 'border-amber-200 bg-amber-50' },
+  { id: 'cranberry', label: 'Cranberry', accentHex: '#be123c', previewClass: 'border-rose-200 bg-rose-50' },
+  { id: 'teal', label: 'Teal', accentHex: '#0f766e', previewClass: 'border-teal-200 bg-teal-50' },
+  { id: 'violet-blue', label: 'Violet Blue', accentHex: '#4338ca', previewClass: 'border-indigo-200 bg-indigo-50' },
+  { id: 'charcoal', label: 'Charcoal', accentHex: '#334155', previewClass: 'border-slate-300 bg-slate-100' },
+  { id: 'orange', label: 'Orange', accentHex: '#c2410c', previewClass: 'border-orange-200 bg-orange-50' },
+] as const;
+
 const IMPORTER_FLOW_STAGES: ImporterFlowStage[] = [
   {
     title: '1. CSV Rows',
@@ -350,7 +368,14 @@ const buildInitialAssignmentMap = (): Record<SkillPath['id'], PathAssignments> =
 
 type ImportStatus =
   | { state: 'idle' }
-  | { state: 'ok'; fileName: string; rowCount: number }
+  | {
+      state: 'ok';
+      fileName: string;
+      rowCount: number;
+      previewRowCount: number;
+      lockedRowCount: number;
+      pathways: ImportedPathwayOption[];
+    }
   | { state: 'error'; fileName: string; message: string; missing?: string[] };
 
 const parseCsvLine = (line: string): string[] => {
@@ -426,6 +451,8 @@ const App: React.FC = () => {
     }
   });
   const [importStatus, setImportStatus] = useState<ImportStatus>({ state: 'idle' });
+  const [selectedPreviewPathwayCode, setSelectedPreviewPathwayCode] = useState('');
+  const [selectedPreviewThemeId, setSelectedPreviewThemeId] = useState<string>(IMPORTER_COLOR_SCHEMES[0].id);
   const [isImporterOpen, setIsImporterOpen] = useState(false);
   const [pathAssignments, setPathAssignments] = useState<Record<SkillPath['id'], PathAssignments>>(
     () => buildInitialAssignmentMap()
@@ -465,6 +492,14 @@ const App: React.FC = () => {
     () => new Map<string, HighSchoolCourse>(ALL_COURSES.map((course) => [course.id, course])),
     []
   );
+  const selectedPreviewTheme = useMemo(
+    () => IMPORTER_COLOR_SCHEMES.find((scheme) => scheme.id === selectedPreviewThemeId) ?? IMPORTER_COLOR_SCHEMES[0],
+    [selectedPreviewThemeId]
+  );
+  const selectedPreviewPathway = useMemo(() => {
+    if (importStatus.state !== 'ok') return null;
+    return importStatus.pathways.find((pathway) => pathway.code === selectedPreviewPathwayCode) ?? importStatus.pathways[0] ?? null;
+  }, [importStatus, selectedPreviewPathwayCode]);
 
   const getCourse = (id: string) => courseById.get(id);
   const selectedPath = useMemo(() => SKILL_PATHS.find((p) => p.id === selectedPathId)!, [selectedPathId]);
@@ -537,10 +572,8 @@ const App: React.FC = () => {
 
   // Computed data for the selected path
   const {
-    satisfiedCats,
     totalCredits,
     wsuResidencyCredits,
-    remainingCats,
     apIbPotentialCredits,
     apIbEarnedCredits,
   } = useMemo(() => {
@@ -729,6 +762,74 @@ const App: React.FC = () => {
     };
   }, [selectedAssignments.pool, requiredCoursesInPool, assignedProgress, selectedPath, courseById]);
 
+  const primaryMissingCategory = assignedProgress.missingCategories[0] ?? null;
+  const studentNextStepCourse = studentNextStep ? getCourse(studentNextStep.courseId) : null;
+  const focusedPoolCourseIds = useMemo(() => {
+    if (requiredCoursesInPool.length > 0) {
+      return requiredCoursesInPool;
+    }
+
+    if (primaryMissingCategory) {
+      return selectedAssignments.pool.filter((id) => courseById.get(id)?.genEdCategory === primaryMissingCategory);
+    }
+
+    if (assignedProgress.residencyCredits < 20) {
+      return selectedAssignments.pool.filter((id) => courseById.get(id)?.type === 'CE');
+    }
+
+    return selectedAssignments.pool;
+  }, [requiredCoursesInPool, primaryMissingCategory, selectedAssignments.pool, courseById, assignedProgress.residencyCredits]);
+
+  const secondaryPoolCourseIds = useMemo(
+    () => selectedAssignments.pool.filter((id) => !focusedPoolCourseIds.includes(id)),
+    [selectedAssignments.pool, focusedPoolCourseIds]
+  );
+
+  const guidanceFocus = useMemo(() => {
+    if (requiredCoursesInPool.length > 0) {
+      return {
+        eyebrow: 'Step 1',
+        title: 'Place required pathway courses first',
+        detail: `${requiredCoursesInPool.length} required pathway course${requiredCoursesInPool.length === 1 ? '' : 's'} still need a year assignment.`,
+        toneClass: 'border-orange-200 bg-orange-50 text-orange-900',
+      };
+    }
+
+    if (primaryMissingCategory) {
+      return {
+        eyebrow: 'Step 2',
+        title: `Close the next college requirement gap: ${primaryMissingCategory}`,
+        detail: 'Choose a course that satisfies this missing category, then place it in the suggested grade.',
+        toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      };
+    }
+
+    if (assignedProgress.residencyCredits < 20) {
+      return {
+        eyebrow: 'Step 3',
+        title: 'Add another Concurrent Enrollment course',
+        detail: `The plan still needs ${20 - assignedProgress.residencyCredits} more residency credits from CE classes.`,
+        toneClass: 'border-blue-200 bg-blue-50 text-blue-900',
+      };
+    }
+
+    if (selectedAssignments.pool.length > 0) {
+      return {
+        eyebrow: 'Final planning pass',
+        title: 'Place the remaining optional courses',
+        detail: 'You are on track. Finish by placing the strongest remaining electives.',
+        toneClass: 'border-slate-200 bg-slate-50 text-slate-900',
+      };
+    }
+
+    return {
+      eyebrow: 'Ready for meeting',
+      title: 'The year plan is fully placed',
+      detail: 'All roadmap and optional courses are assigned. Move to parent prep and counselor talking points.',
+      toneClass: 'border-green-200 bg-green-50 text-green-900',
+    };
+  }, [requiredCoursesInPool.length, primaryMissingCategory, assignedProgress.residencyCredits, selectedAssignments.pool.length]);
+
   const handleToggleExamPassed = (courseId: string) => {
     setUnpassedExamCourseIds((current) =>
       current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
@@ -770,6 +871,12 @@ const App: React.FC = () => {
     setDraggedCourseId(null);
   };
 
+  const handleApplyRecommendation = () => {
+    if (!studentNextStep) return;
+    assignCourseToBucket(studentNextStep.courseId, studentNextStep.targetYear);
+    setSelectedCourseId(studentNextStep.courseId);
+  };
+
   const handleResetPathAssignments = () => {
     setPathAssignments((current) => ({
       ...current,
@@ -800,6 +907,7 @@ const App: React.FC = () => {
           fileName: file.name,
           message: 'CSV needs a header row plus at least one data row.',
         });
+        setSelectedPreviewPathwayCode('');
         return;
       }
 
@@ -813,20 +921,59 @@ const App: React.FC = () => {
           message: 'Missing required columns for onboarding.',
           missing,
         });
+        setSelectedPreviewPathwayCode('');
         return;
       }
+
+      const pathwayCodeIndex = headers.indexOf('pathway_code');
+      const pathwayNameIndex = headers.indexOf('pathway_name');
+      const pathwayMap = new Map<string, string>();
+
+      for (const line of lines.slice(1)) {
+        const values = parseCsvLine(line);
+        const pathwayCode = values[pathwayCodeIndex]?.trim();
+        if (!pathwayCode) continue;
+
+        const pathwayName = values[pathwayNameIndex]?.trim() || pathwayCode;
+        if (!pathwayMap.has(pathwayCode)) {
+          pathwayMap.set(pathwayCode, pathwayName);
+        }
+      }
+
+      const pathways = Array.from(pathwayMap.entries())
+        .map(([code, name]) => ({ code, name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (pathways.length === 0) {
+        setImportStatus({
+          state: 'error',
+          fileName: file.name,
+          message: 'No pathway data found. Add values in pathway_code and retry.',
+        });
+        setSelectedPreviewPathwayCode('');
+        return;
+      }
+
+      const rowCount = lines.length - 1;
+      const previewRowCount = Math.min(rowCount, FREE_PREVIEW_ROW_LIMIT);
+      const lockedRowCount = Math.max(rowCount - previewRowCount, 0);
 
       setImportStatus({
         state: 'ok',
         fileName: file.name,
-        rowCount: lines.length - 1,
+        rowCount,
+        previewRowCount,
+        lockedRowCount,
+        pathways,
       });
+      setSelectedPreviewPathwayCode(pathways[0].code);
     } catch {
       setImportStatus({
         state: 'error',
         fileName: file.name,
         message: 'Unable to read this CSV file.',
       });
+      setSelectedPreviewPathwayCode('');
     } finally {
       event.currentTarget.value = '';
     }
@@ -1318,144 +1465,231 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* SECTION 3: ADDITIONS & GEN ED CHECKLIST */}
-	        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Course Pool */}
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col">
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                  <Plus className="w-5 h-5 mr-2 text-orange-600" />
-                  Course Pool (Unassigned / Optional)
-                </h3>
-              </div>
-		              <div
-                    className={`p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-grow min-h-[240px] rounded-b-xl border-2 border-dashed transition-colors ${
-                      activeDropZone === 'pool' ? 'border-blue-300 bg-blue-50/40' : 'border-transparent'
-                    }`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setActiveDropZone('pool');
-                    }}
-                    onDragLeave={() => {
-                      setActiveDropZone((current) => (current === 'pool' ? null : current));
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      handleDropToBucket('pool');
-                    }}
-                  >
-		                {selectedAssignments.pool.map((id) => {
-		                   const course = getCourse(id);
-		                   return course ? (
-                       <CourseCard
-                         key={id}
-                         course={course}
-                         draggable
-                         isSelected={selectedCourseId === id}
-                         onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
-                       />
-                     ) : null;
-		                })}
-                    {selectedAssignments.pool.length === 0 && (
-                      <div className="text-xs text-gray-400 italic p-2 col-span-full">No courses in pool. Drag a course here to unschedule it.</div>
-                    )}
-		              </div>
-          </div>
+	        {/* SECTION 3: GUIDED COUNSELOR WORKSPACE */}
+	        <div className="space-y-6">
+	          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+	            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+	              <div>
+	                <h3 className="text-xl font-bold text-gray-900">Guided Counselor Workspace</h3>
+	                <p className="text-sm text-gray-600 mt-1">
+	                  Follow one clear move at a time: identify the gap, place the best course, then confirm the checklist updates.
+	                </p>
+	              </div>
+	              <div className={`rounded-lg border px-4 py-3 max-w-md ${guidanceFocus.toneClass}`}>
+	                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">{guidanceFocus.eyebrow}</div>
+	                <div className="text-base font-bold mt-1">{guidanceFocus.title}</div>
+	                <div className="text-sm mt-1 opacity-90">{guidanceFocus.detail}</div>
+	              </div>
+	            </div>
+	          </div>
 
-          {/* Gen Ed Requirements Grid - COMPACT */}
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 flex flex-col h-full">
-             <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">General Education Categories</h3>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">9 Required</span>
-             </div>
-             <div className="grid grid-cols-3 gap-2 flex-grow">
-                {REQUIRED_CATEGORIES.map(cat => {
-                   const isDone = satisfiedCats.has(cat);
-                   return (
-                     <div key={cat} className={`flex flex-col items-center justify-center p-2 rounded text-center border h-full w-full transition-colors ${isDone ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
-                        {isDone 
-                          ? <CheckCircle className="w-5 h-5 text-green-600 mb-1" />
-                          : <Circle className="w-5 h-5 text-gray-300 mb-1" />
-                        }
-                        <span className={`text-[10px] leading-tight font-medium ${isDone ? 'text-green-800' : 'text-gray-400'}`}>
-                          {cat}
-                        </span>
-                     </div>
-                   );
-                })}
-             </div>
-             {remainingCats.length > 0 && (
-                <div className="mt-3 text-[10px] text-yellow-800 bg-yellow-100 p-2 rounded text-center font-medium border border-yellow-200">
-                   Missing: {remainingCats.length} categories
-                </div>
-             )}
-          </div>
+	          <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.95fr] gap-6 items-start">
+	            <div className="space-y-6">
+	              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+	                <div className="px-5 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+	                  <div className="flex items-center justify-between gap-3">
+	                    <div>
+	                      <h3 className="text-lg font-bold text-gray-900">Do This Next</h3>
+	                      <p className="text-sm text-gray-600 mt-1">
+	                        Keep the counselor focused on the next highest-value move.
+	                      </p>
+	                    </div>
+	                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold">
+	                      {selectedAssignments.pool.length} courses not placed
+	                    </span>
+	                  </div>
+	                </div>
+
+	                <div className="p-5 space-y-5">
+	                  {studentNextStep && studentNextStepCourse ? (
+	                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+	                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Recommended move</div>
+	                      <div className="mt-2 text-lg font-bold text-blue-950">{studentNextStepCourse.name}</div>
+	                      <div className="mt-1 text-sm text-blue-900">{studentNextStep.reason}</div>
+	                      <div className="mt-2 text-sm text-blue-800">
+	                        Place this in <span className="font-semibold">{YEAR_LABELS[studentNextStep.targetYear]}</span>.
+	                      </div>
+	                      <button
+	                        onClick={handleApplyRecommendation}
+	                        className="mt-4 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 font-semibold"
+	                      >
+	                        Add Recommended Course to {YEAR_LABELS[studentNextStep.targetYear]}
+	                      </button>
+	                    </div>
+	                  ) : (
+	                    <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-green-900">
+	                      <div className="font-semibold">Planning queue is clear</div>
+	                      <div className="text-sm mt-1">All unplaced courses have been addressed. Move on to parent prep or final talking points.</div>
+	                    </div>
+	                  )}
+
+	                  <div>
+	                    <div className="flex items-center justify-between gap-3 mb-3">
+	                      <div>
+	                        <h4 className="text-base font-bold text-gray-900">Best choices right now</h4>
+	                        <p className="text-sm text-gray-600">
+	                          These courses directly support the current planning step.
+	                        </p>
+	                      </div>
+	                      {primaryMissingCategory && (
+	                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full font-semibold">
+	                          Working on: {primaryMissingCategory}
+	                        </span>
+	                      )}
+	                    </div>
+
+	                    <div
+	                      className={`grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border-2 border-dashed p-3 transition-colors ${
+	                        activeDropZone === 'pool' ? 'border-blue-300 bg-blue-50/40' : 'border-gray-100 bg-gray-50/60'
+	                      }`}
+	                      onDragOver={(event) => {
+	                        event.preventDefault();
+	                        setActiveDropZone('pool');
+	                      }}
+	                      onDragLeave={() => {
+	                        setActiveDropZone((current) => (current === 'pool' ? null : current));
+	                      }}
+	                      onDrop={(event) => {
+	                        event.preventDefault();
+	                        handleDropToBucket('pool');
+	                      }}
+	                    >
+	                      {focusedPoolCourseIds.map((id) => {
+	                        const course = getCourse(id);
+	                        return course ? (
+	                          <CourseCard
+	                            key={id}
+	                            course={course}
+	                            draggable
+	                            isSelected={selectedCourseId === id}
+	                            onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
+	                          />
+	                        ) : null;
+	                      })}
+	                      {focusedPoolCourseIds.length === 0 && (
+	                        <div className="text-sm text-gray-500 italic p-3 col-span-full">
+	                          No focused course suggestions remain for this step.
+	                        </div>
+	                      )}
+	                    </div>
+	                  </div>
+
+	                  <details className="rounded-xl border border-gray-200 bg-gray-50">
+	                    <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900">
+	                      Courses Not Placed Yet ({secondaryPoolCourseIds.length})
+	                    </summary>
+	                    <div className="border-t border-gray-200 p-4">
+	                      {secondaryPoolCourseIds.length > 0 ? (
+	                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+	                          {secondaryPoolCourseIds.map((id) => {
+	                            const course = getCourse(id);
+	                            return course ? (
+	                              <CourseCard
+	                                key={id}
+	                                course={course}
+	                                draggable
+	                                isSelected={selectedCourseId === id}
+	                                onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
+	                              />
+	                            ) : null;
+	                          })}
+	                        </div>
+	                      ) : (
+	                        <div className="text-sm text-gray-500">Everything in the pool is already part of the current focus, or the pool is empty.</div>
+	                      )}
+	                    </div>
+	                  </details>
+	                </div>
+	              </div>
+
+	              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+	                <h3 className="text-lg font-bold text-gray-900 mb-1">After Planning: Parent Meeting Prep</h3>
+	                <p className="text-sm text-gray-600 mb-4">
+	                  Use this after the course placements are in a good spot.
+	                </p>
+	                <div className="bg-emerald-50 border border-emerald-200 rounded p-3 mb-4">
+	                  <div className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Estimated College Savings</div>
+	                  <div className="text-2xl font-black text-emerald-800 mt-1">
+	                    ${estimatedParentSavings.toLocaleString()}
+	                  </div>
+	                  <div className="text-xs text-emerald-700 mt-1">
+	                    Based on assigned credits ({assignedProgress.totalCredits}) x ${ESTIMATED_TUITION_PER_CREDIT}/credit.
+	                  </div>
+	                </div>
+	                <div className="space-y-2">
+	                  {parentPrepQuestions.map((question) => (
+	                    <div key={question} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
+	                      {question}
+	                    </div>
+	                  ))}
+	                </div>
+	              </div>
+	            </div>
+
+	            <div className="space-y-6 xl:sticky xl:top-6">
+	              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+	                <div className="flex items-center justify-between gap-3 mb-4">
+	                  <div>
+	                    <h3 className="text-lg font-bold text-gray-900">College Requirement Checklist</h3>
+	                    <p className="text-sm text-gray-600 mt-1">
+	                      Watch this update as you place courses.
+	                    </p>
+	                  </div>
+	                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-semibold">
+	                    {assignedProgress.satisfiedCategories.size}/9 covered
+	                  </span>
+	                </div>
+
+	                {assignedProgress.missingCategories.length > 0 ? (
+	                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+	                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Still missing</div>
+	                    <div className="mt-2 flex flex-wrap gap-2">
+	                      {assignedProgress.missingCategories.map((category) => (
+	                        <span key={category} className="px-2 py-1 rounded-full bg-white border border-amber-200 text-xs font-medium text-amber-900">
+	                          {category}
+	                        </span>
+	                      ))}
+	                    </div>
+	                  </div>
+	                ) : (
+	                  <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+	                    All General Education categories are currently covered.
+	                  </div>
+	                )}
+
+	                <div className="grid grid-cols-2 gap-2">
+	                  {REQUIRED_CATEGORIES.map((cat) => {
+	                    const isDone = assignedProgress.satisfiedCategories.has(cat);
+	                    return (
+	                      <div key={cat} className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${isDone ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+	                        {isDone ? <CheckCircle className="w-4 h-4 text-green-600 shrink-0" /> : <Circle className="w-4 h-4 text-gray-300 shrink-0" />}
+	                        <span className={`text-xs font-medium leading-tight ${isDone ? 'text-green-800' : 'text-gray-500'}`}>{cat}</span>
+	                      </div>
+	                    );
+	                  })}
+	                </div>
+
+	                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+	                  <div className={`rounded-lg border p-3 ${assignedProgress.residencyCredits >= 20 ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}`}>
+	                    <div className="text-xs uppercase tracking-wide font-semibold text-gray-700">Residency progress</div>
+	                    <div className="text-lg font-bold text-gray-900 mt-1">{assignedProgress.residencyCredits}/20 CE credits</div>
+	                  </div>
+	                  <div className={`rounded-lg border p-3 ${selectedAssignments.pool.length === 0 ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
+	                    <div className="text-xs uppercase tracking-wide font-semibold text-gray-700">Placement progress</div>
+	                    <div className="text-lg font-bold text-gray-900 mt-1">{selectedAssignments.pool.length} courses left in pool</div>
+	                  </div>
+	                </div>
+	              </div>
+	            </div>
+	          </div>
 	        </div>
 
-        {/* SECTION: PARENT + STUDENT STICKY FEATURES */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Parent Meeting Prep</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Use this prep card before counselor meetings.
-            </p>
-            <div className="bg-emerald-50 border border-emerald-200 rounded p-3 mb-4">
-              <div className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Estimated College Savings</div>
-              <div className="text-2xl font-black text-emerald-800 mt-1">
-                ${estimatedParentSavings.toLocaleString()}
-              </div>
-              <div className="text-xs text-emerald-700 mt-1">
-                Based on assigned credits ({assignedProgress.totalCredits}) x ${ESTIMATED_TUITION_PER_CREDIT}/credit.
-              </div>
-            </div>
-            <div className="space-y-2">
-              {parentPrepQuestions.map((question) => (
-                <div key={question} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
-                  {question}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Student Next-Step Recommender</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Suggest one high-impact move to keep signup momentum.
-            </p>
-
-            {studentNextStep ? (
-              <div className="space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                  <div className="text-sm font-semibold text-blue-900">
-                    Suggested Course: {getCourse(studentNextStep.courseId)?.name ?? studentNextStep.courseId}
-                  </div>
-                  <div className="text-xs text-blue-800 mt-1">{studentNextStep.reason}</div>
-                  <div className="text-xs text-blue-700 mt-1">
-                    Recommended placement: {YEAR_LABELS[studentNextStep.targetYear]}
-                  </div>
-                </div>
-                <button
-                  onClick={() => assignCourseToBucket(studentNextStep.courseId, studentNextStep.targetYear)}
-                  className="text-sm rounded bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 font-semibold"
-                >
-                  Apply Recommendation
-                </button>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded p-3">
-                No immediate recommendation. All pool courses have been placed.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* SECTION: COUNSELOR TALKING POINTS */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-          <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Talking Points</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Generated discussion points for student signup meetings.
-          </p>
+	        {/* SECTION: COUNSELOR TALKING POINTS */}
+	        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+	          <h3 className="text-lg font-bold text-gray-900 mb-1">Final Meeting Talking Points</h3>
+	          <p className="text-sm text-gray-600 mb-4">
+	            These unlock once the plan is fully placed.
+	          </p>
 
           {isAllCoursesAssigned ? (
             <div className="space-y-2">
@@ -1465,23 +1699,26 @@ const App: React.FC = () => {
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
-              Assign all classes from the pool to Grade 10-12 to unlock final counselor talking points.
-              <div className="text-xs mt-1">Remaining in pool: {selectedAssignments.pool.length}</div>
-            </div>
-          )}
-        </div>
+	          ) : (
+	            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
+	              Finish placing the remaining pool courses to unlock final meeting talking points.
+	              <div className="text-xs mt-1">Remaining in pool: {selectedAssignments.pool.length}</div>
+	            </div>
+	          )}
+	        </div>
 
 	        {/* SECTION 4: FULL CATALOG - GROUPED */}
 	        <div className="bg-white rounded-xl shadow-md border border-gray-200">
-           <button 
-             onClick={() => setShowFullCatalog(!showFullCatalog)}
-             className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
-           >
-              <h3 className="text-lg font-bold text-gray-900">Course Catalog (All Other Options)</h3>
-              {showFullCatalog ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-           </button>
+	           <button 
+	             onClick={() => setShowFullCatalog(!showFullCatalog)}
+	             className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
+	           >
+	              <div className="text-left">
+	                <h3 className="text-lg font-bold text-gray-900">Backup Course Catalog</h3>
+	                <div className="text-sm font-normal text-gray-500 mt-0.5">Use this when the suggested next course is unavailable or you need another option.</div>
+	              </div>
+	              {showFullCatalog ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+	           </button>
            
            {showFullCatalog && (
              <div className="p-6">
@@ -1643,17 +1880,76 @@ const App: React.FC = () => {
                       <div className="text-xs mt-2">
                         Your file is valid. Next: send this validated CSV and the data dictionary to your implementation contact.
                       </div>
+                      <div className="mt-3 rounded border border-indigo-200 bg-indigo-50 p-3 text-slate-800">
+                        <div className="text-sm font-semibold text-indigo-900">Free Preview active: 1 pathway + first 25 rows</div>
+                        <p className="text-xs text-slate-700 mt-1">
+                          {importStatus.previewRowCount} rows are shown in preview. {importStatus.lockedRowCount} rows are locked until upgrade.
+                        </p>
+                        <div className="mt-3 space-y-3">
+                          <div>
+                            <label htmlFor="free-preview-pathway" className="block text-xs font-semibold text-slate-700 mb-1">
+                              Choose one pathway for your free preview
+                            </label>
+                            <select
+                              id="free-preview-pathway"
+                              value={selectedPreviewPathwayCode}
+                              onChange={(event) => setSelectedPreviewPathwayCode(event.target.value)}
+                              className="block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                              {importStatus.pathways.map((pathway) => (
+                                <option key={pathway.code} value={pathway.code}>
+                                  {pathway.name} ({pathway.code})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <div className="text-xs font-semibold text-slate-700 mb-1">Pick a color scheme (8 free options)</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {IMPORTER_COLOR_SCHEMES.map((scheme) => (
+                                <button
+                                  key={scheme.id}
+                                  type="button"
+                                  onClick={() => setSelectedPreviewThemeId(scheme.id)}
+                                  className={`flex items-center gap-2 rounded border px-2 py-1.5 text-xs font-medium transition-colors ${
+                                    selectedPreviewThemeId === scheme.id
+                                      ? 'border-blue-400 bg-blue-100 text-blue-900'
+                                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <span
+                                    className="inline-block h-3 w-3 rounded-full border border-white/80 shadow-sm"
+                                    style={{ backgroundColor: scheme.accentHex }}
+                                  />
+                                  {scheme.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className={`rounded border p-3 ${selectedPreviewTheme.previewClass}`}>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Free preview snapshot</div>
+                            <div className="text-sm font-semibold text-slate-900 mt-1">
+                              {selectedPreviewPathway ? `${selectedPreviewPathway.name} (${selectedPreviewPathway.code})` : 'Pathway preview'}
+                            </div>
+                            <div className="text-xs text-slate-700 mt-1">
+                              Showing first {importStatus.previewRowCount} rows with the {selectedPreviewTheme.label} color scheme.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <div className="mt-3 rounded border border-blue-200 bg-white p-3 text-slate-800">
-                        <div className="text-sm font-semibold text-blue-900">Ready to launch this on your school website?</div>
+                        <div className="text-sm font-semibold text-blue-900">Unlock full import + website launch for $100</div>
                         <p className="text-xs text-slate-600 mt-1">
-                          We can turn this validated data into a school-branded planner page for counselors, students, and families.
+                          Upgrade unlocks all pathways, all CSV rows, and a school-branded planner page ready for counselors, students, and families.
                         </p>
                         <div className="mt-2 flex flex-col sm:flex-row gap-2">
                           <a
-                            href="mailto:implementation@schoolplanner.app?subject=School%20Website%20Rollout%20Request"
+                            href="mailto:implementation@schoolplanner.app?subject=Unlock%20Full%20Import%20and%20Website%20Launch%20($100)"
                             className="inline-flex items-center justify-center rounded bg-blue-700 text-white px-3 py-2 text-xs font-semibold hover:bg-blue-600 transition-colors"
                           >
-                            Request Website Rollout
+                            Unlock Full Features ($100)
                           </a>
                           <a
                             href="mailto:implementation@schoolplanner.app?subject=15-minute%20School%20Planner%20Setup%20Call"
