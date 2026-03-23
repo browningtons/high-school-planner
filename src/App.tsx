@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X, FileText } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 // --- DATA STRUCTURES ---
 
@@ -454,12 +455,15 @@ const App: React.FC = () => {
   const [selectedPreviewPathwayCode, setSelectedPreviewPathwayCode] = useState('');
   const [selectedPreviewThemeId, setSelectedPreviewThemeId] = useState<string>(IMPORTER_COLOR_SCHEMES[0].id);
   const [isImporterOpen, setIsImporterOpen] = useState(false);
+  const [previewSchoolName, setPreviewSchoolName] = useState('Your School');
   const [pathAssignments, setPathAssignments] = useState<Record<SkillPath['id'], PathAssignments>>(
     () => buildInitialAssignmentMap()
   );
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [draggedCourseId, setDraggedCourseId] = useState<string | null>(null);
   const [activeDropZone, setActiveDropZone] = useState<YearBucket | 'pool' | null>(null);
+  const [lastAppliedMove, setLastAppliedMove] = useState<{ courseName: string; yearLabel: string } | null>(null);
+  const [studentCount, setStudentCount] = useState(50);
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('counselor_setup_step_ids');
@@ -487,6 +491,12 @@ const App: React.FC = () => {
       document.body.style.overflow = previousOverflow;
     };
   }, [isImporterOpen]);
+
+  useEffect(() => {
+    if (!lastAppliedMove) return;
+    const timer = setTimeout(() => setLastAppliedMove(null), 4000);
+    return () => clearTimeout(timer);
+  }, [lastAppliedMove]);
 
   const courseById = useMemo(
     () => new Map<string, HighSchoolCourse>(ALL_COURSES.map((course) => [course.id, course])),
@@ -873,8 +883,13 @@ const App: React.FC = () => {
 
   const handleApplyRecommendation = () => {
     if (!studentNextStep) return;
+    const course = getCourse(studentNextStep.courseId);
+    const yearLabel = YEAR_LABELS[studentNextStep.targetYear];
     assignCourseToBucket(studentNextStep.courseId, studentNextStep.targetYear);
     setSelectedCourseId(studentNextStep.courseId);
+    if (course) {
+      setLastAppliedMove({ courseName: course.name, yearLabel });
+    }
   };
 
   const handleResetPathAssignments = () => {
@@ -891,7 +906,119 @@ const App: React.FC = () => {
     setSelectedCourseId(null);
     setDraggedCourseId(null);
     setActiveDropZone(null);
+    setLastAppliedMove(null);
   }, [selectedPathId]);
+
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    const ml = 40; // margin left
+    const pw = 532; // page width usable
+    let y = 40;
+
+    const addText = (text: string, x: number, size: number, style: 'normal' | 'bold' = 'normal', color: [number, number, number] = [30, 30, 30]) => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', style);
+      doc.setTextColor(...color);
+      doc.text(text, x, y);
+    };
+
+    const checkPage = (needed: number) => {
+      if (y + needed > 740) {
+        doc.addPage();
+        y = 40;
+      }
+    };
+
+    // Header
+    addText('Ogden High School', ml, 20, 'bold');
+    y += 22;
+    addText(`${selectedPath.name} — Student Course Roadmap`, ml, 12, 'normal', [80, 80, 80]);
+    y += 16;
+    addText(`Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, ml, 9, 'normal', [130, 130, 130]);
+    y += 14;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(ml, y, ml + pw, y);
+    y += 20;
+
+    // Grade sections
+    const buckets: YearBucket[] = ['grade10', 'grade11', 'grade12'];
+    for (const bucket of buckets) {
+      checkPage(60);
+      addText(YEAR_LABELS[bucket], ml, 13, 'bold', [40, 40, 40]);
+      y += 6;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(ml, y, ml + pw, y);
+      y += 14;
+
+      const ids = selectedAssignments[bucket];
+      if (ids.length === 0) {
+        addText('No courses assigned', ml + 8, 9, 'normal', [150, 150, 150]);
+        y += 14;
+      } else {
+        for (const id of ids) {
+          checkPage(16);
+          const course = courseById.get(id);
+          if (!course) continue;
+          const credits = course.wsuEquivalent.reduce((sum, eq) => sum + eq.credits, 0);
+          const typeTag = course.type === 'CE' ? '[CE]' : course.type === 'AP' ? '[AP]' : course.type === 'IB' ? '[IB]' : '';
+          addText(`${course.name}`, ml + 8, 10, 'normal');
+          addText(`${credits} cr ${typeTag}`, ml + pw - 60, 9, 'normal', [100, 100, 100]);
+          y += 14;
+        }
+      }
+
+      checkPage(16);
+      addText(`Subtotal: ${yearlyCreditTotals[bucket]} credit hours`, ml + 8, 9, 'bold', [100, 100, 100]);
+      y += 22;
+    }
+
+    // Degree Progress Summary
+    checkPage(80);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(ml, y, ml + pw, y);
+    y += 18;
+    addText('Degree Progress Summary', ml, 13, 'bold');
+    y += 18;
+
+    addText(`Total Assigned Credits: ${assignedProgress.totalCredits} / 60`, ml + 8, 10, 'normal');
+    y += 14;
+    addText(`CE Residency Credits: ${assignedProgress.residencyCredits} / 20`, ml + 8, 10, 'normal');
+    y += 14;
+    addText(`Gen Ed Categories Covered: ${assignedProgress.satisfiedCategories.size} / ${REQUIRED_CATEGORIES.length}`, ml + 8, 10, 'normal');
+    y += 14;
+
+    if (assignedProgress.missingCategories.length > 0) {
+      addText(`Missing: ${assignedProgress.missingCategories.join(', ')}`, ml + 8, 9, 'normal', [180, 80, 40]);
+      y += 14;
+    } else {
+      addText('All Gen Ed categories covered', ml + 8, 9, 'normal', [40, 140, 80]);
+      y += 14;
+    }
+
+    // Savings
+    y += 8;
+    addText(`Estimated College Savings: $${estimatedParentSavings.toLocaleString()}`, ml + 8, 10, 'bold', [5, 100, 60]);
+    y += 12;
+    addText(`Based on ${assignedProgress.totalCredits} credits × $${ESTIMATED_TUITION_PER_CREDIT}/credit`, ml + 8, 8, 'normal', [130, 130, 130]);
+    y += 22;
+
+    // Counselor Contacts
+    checkPage(60);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(ml, y, ml + pw, y);
+    y += 18;
+    addText('Academic Support Team', ml, 13, 'bold');
+    y += 16;
+
+    for (const counselor of COUNSELORS) {
+      checkPage(18);
+      const line = `${counselor.name} — ${counselor.role} — ${counselor.email}${counselor.assignment ? ` (${counselor.assignment})` : ''}`;
+      addText(line, ml + 8, 9, 'normal', [80, 80, 80]);
+      y += 13;
+    }
+
+    doc.save(`roadmap-${selectedPath.id}.pdf`);
+  };
 
   const handleImportCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1289,6 +1416,56 @@ const App: React.FC = () => {
 	            </div>
 	        </div>
 
+        {/* SECTION: SCHOOL-WIDE SAVINGS CALCULATOR */}
+        <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl shadow-md border border-emerald-200 p-5">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="text-center sm:text-left flex-shrink-0">
+              <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">Per-Student College Savings</div>
+              <div className="text-3xl font-black text-emerald-800 mt-1">
+                ${estimatedParentSavings.toLocaleString()}
+              </div>
+              <div className="text-xs text-emerald-600 mt-1">
+                {assignedProgress.totalCredits} credits × ${ESTIMATED_TUITION_PER_CREDIT}/credit
+              </div>
+            </div>
+
+            <div className="hidden sm:block w-px h-16 bg-emerald-200 flex-shrink-0" />
+
+            <div className="flex-grow text-center sm:text-left">
+              <label htmlFor="student-count" className="text-xs font-semibold text-emerald-800">
+                Students in graduating class
+              </label>
+              <div className="flex items-center gap-3 mt-1.5">
+                <input
+                  id="student-count"
+                  type="number"
+                  min={1}
+                  max={2000}
+                  value={studentCount}
+                  onChange={(e) => setStudentCount(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                  className="w-20 rounded border border-emerald-300 px-2 py-1.5 text-sm text-center font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+                <input
+                  type="range"
+                  min={10}
+                  max={500}
+                  step={10}
+                  value={studentCount}
+                  onChange={(e) => setStudentCount(Number(e.target.value))}
+                  className="flex-grow accent-emerald-600 h-2"
+                />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-emerald-800">
+                  ${(estimatedParentSavings * studentCount).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-emerald-600">estimated school-wide savings</div>
+              </div>
+              <div className="text-[11px] text-emerald-500 italic mt-1">Use this number in your board presentation</div>
+            </div>
+          </div>
+        </div>
+
         {/* SECTION: COUNSELOR ONBOARDING + PLAYBOOK */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
@@ -1350,12 +1527,21 @@ const App: React.FC = () => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
-            <button
-              onClick={handleResetPathAssignments}
-              className="text-xs sm:text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 font-semibold text-gray-700"
-            >
-              Reset to Path Default
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownloadPdf}
+                className="text-xs sm:text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 font-semibold text-gray-700 flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Download PDF
+              </button>
+              <button
+                onClick={handleResetPathAssignments}
+                className="text-xs sm:text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 font-semibold text-gray-700"
+              >
+                Reset to Path Default
+              </button>
+            </div>
           </div>
 
           <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
@@ -1520,6 +1706,15 @@ const App: React.FC = () => {
 	                    <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-green-900">
 	                      <div className="font-semibold">Planning queue is clear</div>
 	                      <div className="text-sm mt-1">All unplaced courses have been addressed. Move on to parent prep or final talking points.</div>
+	                    </div>
+	                  )}
+
+	                  {lastAppliedMove && (
+	                    <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 flex items-center gap-3 animate-[fadeSlideIn_0.3s_ease-out]">
+	                      <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+	                      <div className="text-sm text-green-900">
+	                        <span className="font-semibold">{lastAppliedMove.courseName}</span> placed in <span className="font-semibold">{lastAppliedMove.yearLabel}</span>. Scroll up to see it in the roadmap.
+	                      </div>
 	                    </div>
 	                  )}
 
@@ -1928,13 +2123,53 @@ const App: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className={`rounded border p-3 ${selectedPreviewTheme.previewClass}`}>
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Free preview snapshot</div>
-                            <div className="text-sm font-semibold text-slate-900 mt-1">
-                              {selectedPreviewPathway ? `${selectedPreviewPathway.name} (${selectedPreviewPathway.code})` : 'Pathway preview'}
+                          <div className="rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                            <div className="px-3 py-2.5" style={{ backgroundColor: selectedPreviewTheme.accentHex }}>
+                              <input
+                                type="text"
+                                value={previewSchoolName}
+                                onChange={(e) => setPreviewSchoolName(e.target.value)}
+                                placeholder="Your School"
+                                className="bg-transparent text-white text-sm font-bold w-full outline-none placeholder-white/50 border-b border-white/20 pb-0.5"
+                              />
+                              <div className="text-white/70 text-[11px] mt-0.5">Associate Degree Planner</div>
                             </div>
-                            <div className="text-xs text-slate-700 mt-1">
-                              Showing first {importStatus.previewRowCount} rows with the {selectedPreviewTheme.label} color scheme.
+                            {importStatus.state === 'ok' && importStatus.pathways.length > 0 && (
+                              <div className="flex gap-1 px-2 py-1.5" style={{ backgroundColor: `${selectedPreviewTheme.accentHex}dd` }}>
+                                {importStatus.pathways.slice(0, 4).map((pw) => (
+                                  <span
+                                    key={pw.code}
+                                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                      pw.code === selectedPreviewPathwayCode
+                                        ? 'bg-white font-semibold'
+                                        : 'bg-white/20 text-white/80'
+                                    }`}
+                                    style={pw.code === selectedPreviewPathwayCode ? { color: selectedPreviewTheme.accentHex } : undefined}
+                                  >
+                                    {pw.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="bg-white p-3 space-y-2">
+                              {selectedPreviewPathway && (
+                                <div className="text-sm font-semibold" style={{ color: selectedPreviewTheme.accentHex }}>
+                                  {selectedPreviewPathway.name}
+                                </div>
+                              )}
+                              {['Grade 10', 'Grade 11', 'Grade 12'].map((grade) => (
+                                <div key={grade}>
+                                  <div className="text-[10px] font-semibold text-slate-500 mb-1">{grade}</div>
+                                  <div className="flex gap-1.5">
+                                    <div className="h-2 rounded bg-slate-200" style={{ width: '4rem' }} />
+                                    <div className="h-2 rounded bg-slate-200" style={{ width: '5rem' }} />
+                                    <div className="h-2 rounded bg-slate-100" style={{ width: '3rem' }} />
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                                {importStatus.state === 'ok' ? importStatus.previewRowCount : 0} courses loaded &middot; {selectedPreviewTheme.label} theme
+                              </div>
                             </div>
                           </div>
                         </div>
