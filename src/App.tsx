@@ -40,6 +40,7 @@ type YearBucket = keyof YearlySchedule;
 
 interface PathAssignments extends YearlySchedule {
   pool: string[];
+  onDeck: string[];
 }
 
 interface SkillPath {
@@ -331,6 +332,7 @@ const IMPORTER_TROUBLESHOOTING_TIPS = [
 ];
 
 const ESTIMATED_TUITION_PER_CREDIT = 120;
+const MAX_COURSES_PER_YEAR = 8;
 
 const COUNSELOR_SETUP_STEPS = [
   { id: 'import', label: 'Import school CSV template and validate required columns' },
@@ -358,6 +360,7 @@ const buildInitialAssignments = (path: SkillPath): PathAssignments => {
     grade11: [...path.schedule.grade11],
     grade12: [...path.schedule.grade12],
     pool,
+    onDeck: [],
   };
 };
 
@@ -463,6 +466,7 @@ const App: React.FC = () => {
   const [draggedCourseId, setDraggedCourseId] = useState<string | null>(null);
   const [activeDropZone, setActiveDropZone] = useState<YearBucket | 'pool' | null>(null);
   const [lastAppliedMove, setLastAppliedMove] = useState<{ courseName: string; yearLabel: string } | null>(null);
+  const [catalogAssignCourseId, setCatalogAssignCourseId] = useState<string | null>(null);
   const [studentCount, setStudentCount] = useState(50);
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
@@ -852,7 +856,7 @@ const App: React.FC = () => {
     );
   };
 
-  const assignCourseToBucket = (courseId: string, targetBucket: YearBucket | 'pool') => {
+  const assignCourseToBucket = (courseId: string, targetBucket: YearBucket | 'pool' | 'onDeck') => {
     setPathAssignments((current) => {
       const currentAssignments = current[selectedPathId] ?? buildInitialAssignments(selectedPath);
       const nextAssignments: PathAssignments = {
@@ -860,12 +864,14 @@ const App: React.FC = () => {
         grade11: currentAssignments.grade11.filter((id) => id !== courseId),
         grade12: currentAssignments.grade12.filter((id) => id !== courseId),
         pool: currentAssignments.pool.filter((id) => id !== courseId),
+        onDeck: currentAssignments.onDeck.filter((id) => id !== courseId),
       };
 
       if (targetBucket === 'grade10') nextAssignments.grade10.push(courseId);
       if (targetBucket === 'grade11') nextAssignments.grade11.push(courseId);
       if (targetBucket === 'grade12') nextAssignments.grade12.push(courseId);
       if (targetBucket === 'pool') nextAssignments.pool.push(courseId);
+      if (targetBucket === 'onDeck') nextAssignments.onDeck.push(courseId);
 
       return {
         ...current,
@@ -891,6 +897,14 @@ const App: React.FC = () => {
       setLastAppliedMove({ courseName: course.name, yearLabel });
     }
   };
+
+  const handleCatalogAssign = (targetBucket: YearBucket | 'onDeck') => {
+    if (!catalogAssignCourseId) return;
+    assignCourseToBucket(catalogAssignCourseId, targetBucket);
+    setCatalogAssignCourseId(null);
+  };
+
+  const catalogAssignCourse = catalogAssignCourseId ? getCourse(catalogAssignCourseId) : null;
 
   const handleResetPathAssignments = () => {
     setPathAssignments((current) => ({
@@ -1129,8 +1143,8 @@ const App: React.FC = () => {
 
   // Filter courses for catalog (exclude ones already in path or recommended)
   const groupedCatalog = useMemo(() => {
-    const pathIds = new Set(plannedCourseIds);
-    
+    const pathIds = new Set([...plannedCourseIds, ...selectedAssignments.onDeck]);
+
     const available = ALL_COURSES.filter((c) => !pathIds.has(c.id)).filter(
       (c) =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1144,9 +1158,9 @@ const App: React.FC = () => {
       if (!groups[course.category]) groups[course.category] = [];
       groups[course.category].push(course);
     });
-    
+
     return groups;
-  }, [plannedCourseIds, searchTerm]);
+  }, [plannedCourseIds, selectedAssignments.onDeck, searchTerm]);
 
 
   const CourseCard: React.FC<{
@@ -1172,7 +1186,7 @@ const App: React.FC = () => {
       <div
         className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden ${
           compact ? 'p-2' : 'p-3 mb-2'
-        } ${isSelected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200'} ${draggable ? 'cursor-move' : ''}`}
+        } ${isSelected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200'} ${draggable ? 'cursor-move' : onSelect ? 'cursor-pointer' : ''}`}
         draggable={draggable}
         onDragStart={() => {
           if (!draggable) return;
@@ -1937,7 +1951,7 @@ const App: React.FC = () => {
                     <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-100 pb-1">{category}</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {courses.map(c => (
-                        <CourseCard key={c.id} course={c} compact />
+                        <CourseCard key={c.id} course={c} compact onSelect={() => setCatalogAssignCourseId(c.id)} />
                       ))}
                     </div>
                   </div>
@@ -1945,6 +1959,37 @@ const App: React.FC = () => {
              </div>
            )}
         </div>
+
+        {/* SECTION: ON DECK LIST */}
+        {selectedAssignments.onDeck.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">On Deck</h3>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  Courses you're considering but haven't placed in a year yet.
+                </p>
+              </div>
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-semibold">
+                {selectedAssignments.onDeck.length} course{selectedAssignments.onDeck.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {selectedAssignments.onDeck.map((id) => {
+                const course = getCourse(id);
+                return course ? (
+                  <div key={id} className="relative">
+                    <CourseCard
+                      course={course}
+                      compact
+                      onSelect={() => setCatalogAssignCourseId(id)}
+                    />
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
 
         {/* SECTION 5: ACADEMIC SUPPORT TEAM */}
         <div className="bg-slate-900 rounded-xl shadow-lg p-6 md:p-8 text-white">
@@ -1973,6 +2018,78 @@ const App: React.FC = () => {
         </div>
 
       </div>
+
+      {catalogAssignCourseId && catalogAssignCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            className="absolute inset-0 bg-slate-950/50"
+            onClick={() => setCatalogAssignCourseId(null)}
+            aria-label="Close assignment popup"
+          />
+          <div className="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm p-5">
+            <button
+              onClick={() => setCatalogAssignCourseId(null)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="mb-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Add to Roadmap</div>
+              <div className="text-lg font-bold text-gray-900 mt-1">{catalogAssignCourse.name}</div>
+              <div className="text-sm text-gray-600 mt-0.5">
+                {catalogAssignCourse.wsuEquivalent.reduce((sum, eq) => sum + eq.credits, 0)} credits
+                {catalogAssignCourse.genEdCategory && <> &middot; {catalogAssignCourse.genEdCategory}</>}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {([
+                { bucket: 'grade10' as YearBucket, label: 'Grade 10', count: selectedAssignments.grade10.length },
+                { bucket: 'grade11' as YearBucket, label: 'Grade 11', count: selectedAssignments.grade11.length },
+                { bucket: 'grade12' as YearBucket, label: 'Grade 12', count: selectedAssignments.grade12.length },
+              ]).map(({ bucket, label, count }) => {
+                const isFull = count >= MAX_COURSES_PER_YEAR;
+                return (
+                  <button
+                    key={bucket}
+                    disabled={isFull}
+                    onClick={() => handleCatalogAssign(bucket)}
+                    className={`w-full flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-colors ${
+                      isFull
+                        ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-200 bg-white text-gray-800 hover:bg-blue-50 hover:border-blue-200'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className={`text-xs font-medium ${isFull ? 'text-red-400' : 'text-gray-500'}`}>
+                      {count}/{MAX_COURSES_PER_YEAR} {isFull ? '(full)' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+
+              <div className="pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => handleCatalogAssign('onDeck')}
+                  className="w-full flex items-center justify-between rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                >
+                  <span>Add to On Deck</span>
+                  <span className="text-xs font-medium text-amber-600">holding list</span>
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setCatalogAssignCourseId(null)}
+              className="mt-3 w-full text-center text-xs text-gray-500 hover:text-gray-700 py-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {isImporterOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6">
