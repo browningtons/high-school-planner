@@ -1031,10 +1031,9 @@ const App: React.FC = () => {
       const colX = ml + i * (colW + colGap);
       let cy = colStartY;
 
-      // Column header with orange top border
-      rect(colX, cy, colW, 3, borderColors[i]);
+      // Column header with orange top accent
       roundRect(colX, cy, colW, 28, 3, [255, 247, 237]); // orange-50
-      rect(colX, cy + 3, colW, 25, [255, 247, 237]); // cover bottom rounding
+      roundRect(colX, cy, colW, 3, 3, borderColors[i]); // thin accent on top
       text(gradeLabels[i], colX + 8, cy + 18, 9, 'bold', [154, 52, 18]); // orange-800
 
       // Credit badge right-aligned
