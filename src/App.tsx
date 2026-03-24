@@ -979,7 +979,6 @@ const App: React.FC = () => {
 
     // Date in top-right
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    text(dateStr, pageW - mr, 28, 8, 'normal', [148, 163, 184]);
     doc.setFontSize(8);
     const dateW = doc.getTextWidth(dateStr);
     text(dateStr, pageW - mr - dateW, 28, 8, 'normal', [148, 163, 184]);
