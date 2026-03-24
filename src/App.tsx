@@ -925,111 +925,237 @@ const App: React.FC = () => {
 
   const handleDownloadPdf = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-    const ml = 40; // margin left
-    const pw = 532; // page width usable
-    let y = 40;
+    const pageW = 612;
+    const ml = 36;
+    const mr = 36;
+    const pw = pageW - ml - mr; // 540
+    let y = 0;
 
-    const addText = (text: string, x: number, size: number, style: 'normal' | 'bold' = 'normal', color: [number, number, number] = [30, 30, 30]) => {
+    // Colors matching the app
+    const slate900: [number, number, number] = [15, 23, 42];
+    const orange500: [number, number, number] = [234, 88, 12];
+    const orange200: [number, number, number] = [253, 186, 116];
+    const white: [number, number, number] = [255, 255, 255];
+    const gray600: [number, number, number] = [75, 85, 99];
+    const gray400: [number, number, number] = [156, 163, 175];
+    const green600: [number, number, number] = [22, 163, 74];
+    const emerald700: [number, number, number] = [4, 120, 87];
+
+    const text = (s: string, x: number, yPos: number, size: number, style: 'normal' | 'bold' = 'normal', color: [number, number, number] = [30, 30, 30]) => {
       doc.setFontSize(size);
       doc.setFont('helvetica', style);
       doc.setTextColor(...color);
-      doc.text(text, x, y);
+      doc.text(s, x, yPos);
+    };
+
+    const rect = (x: number, yPos: number, w: number, h: number, color: [number, number, number]) => {
+      doc.setFillColor(...color);
+      doc.rect(x, yPos, w, h, 'F');
+    };
+
+    const roundRect = (x: number, yPos: number, w: number, h: number, r: number, color: [number, number, number]) => {
+      doc.setFillColor(...color);
+      doc.roundedRect(x, yPos, w, h, r, r, 'F');
     };
 
     const checkPage = (needed: number) => {
       if (y + needed > 740) {
         doc.addPage();
-        y = 40;
+        y = 36;
       }
     };
 
-    // Header
-    addText('Ogden High School', ml, 20, 'bold');
-    y += 22;
-    addText(`${selectedPath.name} — Student Course Roadmap`, ml, 12, 'normal', [80, 80, 80]);
-    y += 16;
-    addText(`Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, ml, 9, 'normal', [130, 130, 130]);
-    y += 14;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(ml, y, ml + pw, y);
-    y += 20;
+    // ── DARK HEADER BAR (matches app's slate-900 banner) ──
+    const headerH = 80;
+    rect(0, 0, pageW, headerH, slate900);
 
-    // Grade sections
+    // Orange accent line at bottom of header
+    rect(0, headerH - 3, pageW, 3, orange500);
+
+    // Header text
+    text('OGDEN SCHOOL DISTRICT  •  WSU', ml, 28, 8, 'bold', orange200);
+    text('Student Course Roadmap', ml, 48, 18, 'bold', white);
+    text(`${selectedPath.name}`, ml, 64, 11, 'normal', [203, 213, 225]); // slate-300
+
+    // Date in top-right
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    text(dateStr, pageW - mr, 28, 8, 'normal', [148, 163, 184]);
+    doc.setFontSize(8);
+    const dateW = doc.getTextWidth(dateStr);
+    text(dateStr, pageW - mr - dateW, 28, 8, 'normal', [148, 163, 184]);
+
+    y = headerH + 20;
+
+    // ── PROGRESS SUMMARY STRIP ──
+    const stripH = 56;
+    roundRect(ml, y, pw, stripH, 4, [249, 250, 251]); // gray-100
+    doc.setDrawColor(229, 231, 235); // gray-200
+    doc.roundedRect(ml, y, pw, stripH, 4, 4, 'S');
+
+    // Three stat boxes across the strip
+    const statW = pw / 3;
+    const statY = y + 16;
+
+    // Credits
+    text('Total Credits', ml + 14, statY, 8, 'bold', gray600);
+    const credColor = assignedProgress.totalCredits >= 60 ? green600 : orange500;
+    text(`${assignedProgress.totalCredits} / 60`, ml + 14, statY + 16, 14, 'bold', credColor);
+
+    // Residency
+    text('CE Residency', ml + statW + 14, statY, 8, 'bold', gray600);
+    const resColor = assignedProgress.residencyCredits >= 20 ? green600 : orange500;
+    text(`${assignedProgress.residencyCredits} / 20`, ml + statW + 14, statY + 16, 14, 'bold', resColor);
+
+    // Gen Ed
+    text('Gen Ed Coverage', ml + statW * 2 + 14, statY, 8, 'bold', gray600);
+    const genColor = assignedProgress.missingCategories.length === 0 ? green600 : orange500;
+    text(`${assignedProgress.satisfiedCategories.size} / ${REQUIRED_CATEGORIES.length}`, ml + statW * 2 + 14, statY + 16, 14, 'bold', genColor);
+
+    // Vertical dividers
+    doc.setDrawColor(220, 220, 220);
+    doc.line(ml + statW, y + 10, ml + statW, y + stripH - 10);
+    doc.line(ml + statW * 2, y + 10, ml + statW * 2, y + stripH - 10);
+
+    y += stripH + 16;
+
+    // ── GRADE COLUMNS (side by side) ──
+    const colGap = 12;
+    const colW = (pw - colGap * 2) / 3;
+    const colStartY = y;
     const buckets: YearBucket[] = ['grade10', 'grade11', 'grade12'];
-    for (const bucket of buckets) {
-      checkPage(60);
-      addText(YEAR_LABELS[bucket], ml, 13, 'bold', [40, 40, 40]);
-      y += 6;
-      doc.setDrawColor(220, 220, 220);
-      doc.line(ml, y, ml + pw, y);
-      y += 14;
+    const gradeLabels = ['Sophomore (10)', 'Junior (11)', 'Senior (12)'];
+    const borderColors: [number, number, number][] = [[251, 146, 60], [249, 115, 22], [234, 88, 12]]; // orange-400/500/600
+
+    let maxColBottom = y;
+
+    buckets.forEach((bucket, i) => {
+      const colX = ml + i * (colW + colGap);
+      let cy = colStartY;
+
+      // Column header with orange top border
+      rect(colX, cy, colW, 3, borderColors[i]);
+      roundRect(colX, cy, colW, 28, 3, [255, 247, 237]); // orange-50
+      rect(colX, cy + 3, colW, 25, [255, 247, 237]); // cover bottom rounding
+      text(gradeLabels[i], colX + 8, cy + 18, 9, 'bold', [154, 52, 18]); // orange-800
+
+      // Credit badge right-aligned
+      const credStr = `${yearlyCreditTotals[bucket]} cr`;
+      doc.setFontSize(8);
+      const credBadgeW = doc.getTextWidth(credStr) + 10;
+      roundRect(colX + colW - credBadgeW - 6, cy + 8, credBadgeW, 14, 3, [255, 237, 213]); // orange-100
+      text(credStr, colX + colW - credBadgeW - 1, cy + 18, 8, 'bold', [154, 52, 18]);
+
+      cy += 34;
 
       const ids = selectedAssignments[bucket];
       if (ids.length === 0) {
-        addText('No courses assigned', ml + 8, 9, 'normal', [150, 150, 150]);
-        y += 14;
+        text('No courses assigned', colX + 6, cy + 10, 8, 'normal', gray400);
+        cy += 18;
       } else {
         for (const id of ids) {
-          checkPage(16);
           const course = courseById.get(id);
           if (!course) continue;
           const credits = course.wsuEquivalent.reduce((sum, eq) => sum + eq.credits, 0);
-          const typeTag = course.type === 'CE' ? '[CE]' : course.type === 'AP' ? '[AP]' : course.type === 'IB' ? '[IB]' : '';
-          addText(`${course.name}`, ml + 8, 10, 'normal');
-          addText(`${credits} cr ${typeTag}`, ml + pw - 60, 9, 'normal', [100, 100, 100]);
-          y += 14;
+
+          // Course row background
+          roundRect(colX, cy, colW, 22, 3, [255, 255, 255]);
+          doc.setDrawColor(240, 240, 240);
+          doc.roundedRect(colX, cy, colW, 22, 3, 3, 'S');
+
+          // Course name (truncated to fit column)
+          doc.setFontSize(8);
+          let displayName = course.name;
+          while (doc.getTextWidth(displayName) > colW - 50 && displayName.length > 10) {
+            displayName = displayName.slice(0, -1);
+          }
+          if (displayName !== course.name) displayName += '...';
+          text(displayName, colX + 6, cy + 14, 8, 'normal', [30, 30, 30]);
+
+          // Type badge
+          const badgeColor: [number, number, number] = course.type === 'CE' ? [255, 237, 213] : [243, 244, 246];
+          const badgeText: [number, number, number] = course.type === 'CE' ? [154, 52, 18] : [75, 85, 99];
+          const badge = course.type === 'CE' ? 'CE' : course.type;
+          doc.setFontSize(6);
+          const bw = doc.getTextWidth(badge) + 6;
+          roundRect(colX + colW - bw - 20, cy + 5, bw, 12, 2, badgeColor);
+          text(badge, colX + colW - bw - 17, cy + 13, 6, 'bold', badgeText);
+
+          // Credits
+          text(`${credits}`, colX + colW - 14, cy + 14, 8, 'normal', gray400);
+
+          cy += 26;
         }
       }
+      maxColBottom = Math.max(maxColBottom, cy);
+    });
 
-      checkPage(16);
-      addText(`Subtotal: ${yearlyCreditTotals[bucket]} credit hours`, ml + 8, 9, 'bold', [100, 100, 100]);
-      y += 22;
-    }
+    y = maxColBottom + 12;
 
-    // Degree Progress Summary
+    // ── GEN ED CHECKLIST ──
     checkPage(80);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(ml, y, ml + pw, y);
-    y += 18;
-    addText('Degree Progress Summary', ml, 13, 'bold');
-    y += 18;
+    roundRect(ml, y, pw, 20, 4, slate900);
+    text('Gen Ed Category Checklist', ml + 10, y + 14, 9, 'bold', white);
+    y += 26;
 
-    addText(`Total Assigned Credits: ${assignedProgress.totalCredits} / 60`, ml + 8, 10, 'normal');
-    y += 14;
-    addText(`CE Residency Credits: ${assignedProgress.residencyCredits} / 20`, ml + 8, 10, 'normal');
-    y += 14;
-    addText(`Gen Ed Categories Covered: ${assignedProgress.satisfiedCategories.size} / ${REQUIRED_CATEGORIES.length}`, ml + 8, 10, 'normal');
-    y += 14;
+    const catCols = 3;
+    const catColW = pw / catCols;
+    REQUIRED_CATEGORIES.forEach((cat, i) => {
+      const col = i % catCols;
+      const row = Math.floor(i / catCols);
+      const cx = ml + col * catColW;
+      const cy = y + row * 18;
+      const isCovered = assignedProgress.satisfiedCategories.has(cat);
 
-    if (assignedProgress.missingCategories.length > 0) {
-      addText(`Missing: ${assignedProgress.missingCategories.join(', ')}`, ml + 8, 9, 'normal', [180, 80, 40]);
-      y += 14;
-    } else {
-      addText('All Gen Ed categories covered', ml + 8, 9, 'normal', [40, 140, 80]);
-      y += 14;
-    }
+      // Checkmark or empty circle
+      if (isCovered) {
+        roundRect(cx, cy, 10, 10, 2, [220, 252, 231]); // green-100
+        text('✓', cx + 2, cy + 8, 8, 'bold', green600);
+      } else {
+        doc.setDrawColor(200, 200, 200);
+        doc.roundedRect(cx, cy, 10, 10, 2, 2, 'S');
+      }
+      text(cat, cx + 14, cy + 9, 8, 'normal', isCovered ? [30, 30, 30] : [180, 80, 40]);
+    });
 
-    // Savings
-    y += 8;
-    addText(`Estimated College Savings: $${estimatedParentSavings.toLocaleString()}`, ml + 8, 10, 'bold', [5, 100, 60]);
-    y += 12;
-    addText(`Based on ${assignedProgress.totalCredits} credits × $${ESTIMATED_TUITION_PER_CREDIT}/credit`, ml + 8, 8, 'normal', [130, 130, 130]);
-    y += 22;
+    y += Math.ceil(REQUIRED_CATEGORIES.length / catCols) * 18 + 12;
 
-    // Counselor Contacts
-    checkPage(60);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(ml, y, ml + pw, y);
-    y += 18;
-    addText('Academic Support Team', ml, 13, 'bold');
-    y += 16;
+    // ── SAVINGS CALLOUT ──
+    checkPage(50);
+    roundRect(ml, y, pw, 40, 4, [236, 253, 245]); // emerald-50
+    doc.setDrawColor(167, 243, 208); // emerald-200
+    doc.roundedRect(ml, y, pw, 40, 4, 4, 'S');
+    text('ESTIMATED COLLEGE SAVINGS', ml + 12, y + 14, 7, 'bold', emerald700);
+    text(`$${estimatedParentSavings.toLocaleString()}`, ml + 12, y + 30, 16, 'bold', emerald700);
+    text(`${assignedProgress.totalCredits} credits × $${ESTIMATED_TUITION_PER_CREDIT}/credit`, ml + 110, y + 30, 9, 'normal', [75, 85, 99]);
+    y += 52;
 
-    for (const counselor of COUNSELORS) {
-      checkPage(18);
-      const line = `${counselor.name} — ${counselor.role} — ${counselor.email}${counselor.assignment ? ` (${counselor.assignment})` : ''}`;
-      addText(line, ml + 8, 9, 'normal', [80, 80, 80]);
-      y += 13;
-    }
+    // ── COUNSELOR CONTACTS ──
+    checkPage(70);
+    roundRect(ml, y, pw, 20, 4, slate900);
+    text('Academic Support Team', ml + 10, y + 14, 9, 'bold', white);
+    y += 26;
+
+    COUNSELORS.forEach((counselor, i) => {
+      checkPage(22);
+      const rowBg: [number, number, number] = i % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+      roundRect(ml, y, pw, 18, 2, rowBg);
+      text(counselor.name, ml + 8, y + 12, 8, 'bold', [30, 30, 30]);
+      text(counselor.role, ml + 130, y + 12, 8, 'normal', gray600);
+      text(counselor.email, ml + 310, y + 12, 8, 'normal', gray400);
+      if (counselor.assignment) {
+        text(counselor.assignment, ml + pw - 80, y + 12, 7, 'normal', gray400);
+      }
+      y += 20;
+    });
+
+    y += 10;
+
+    // ── FOOTER ──
+    const footerY = 760;
+    doc.setDrawColor(229, 231, 235);
+    doc.line(ml, footerY, ml + pw, footerY);
+    text('Ogden School District • Weber State University', ml, footerY + 12, 7, 'normal', gray400);
+    text(dateStr, ml + pw - 80, footerY + 12, 7, 'normal', gray400);
 
     doc.save(`roadmap-${selectedPath.id}.pdf`);
   };
