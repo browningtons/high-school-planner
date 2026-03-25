@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X, FileText } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X, FileText, Copy, Check, DollarSign, ArrowRight, Lock, Unlock, Star } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 // --- DATA STRUCTURES ---
@@ -468,6 +468,7 @@ const App: React.FC = () => {
   const [lastAppliedMove, setLastAppliedMove] = useState<{ courseName: string; yearLabel: string } | null>(null);
   const [catalogAssignCourseId, setCatalogAssignCourseId] = useState<string | null>(null);
   const [studentCount, setStudentCount] = useState(50);
+  const [copiedSavings, setCopiedSavings] = useState(false);
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('counselor_setup_step_ids');
@@ -1554,52 +1555,81 @@ const App: React.FC = () => {
 	            </div>
 	        </div>
 
-        {/* SECTION: SCHOOL-WIDE SAVINGS CALCULATOR */}
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl shadow-md border border-emerald-200 p-5">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <div className="text-center sm:text-left flex-shrink-0">
-              <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">Per-Student College Savings</div>
-              <div className="text-3xl font-black text-emerald-800 mt-1">
-                ${estimatedParentSavings.toLocaleString()}
+        {/* SECTION: SCHOOL-WIDE ROI CALCULATOR */}
+        <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-xl shadow-md border border-emerald-200 overflow-hidden">
+          <div className="px-5 py-3 bg-emerald-800 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-200" />
+            <span className="text-sm font-bold text-white">School-Wide ROI Calculator</span>
+            <span className="ml-auto text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Share with your board</span>
+          </div>
+          <div className="p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <div className="text-center sm:text-left">
+                <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">Per-Student Savings</div>
+                <div className="text-3xl font-black text-emerald-800 mt-1">
+                  ${estimatedParentSavings.toLocaleString()}
+                </div>
+                <div className="text-xs text-emerald-600 mt-1">
+                  {assignedProgress.totalCredits} credits × ${ESTIMATED_TUITION_PER_CREDIT}/credit
+                </div>
               </div>
-              <div className="text-xs text-emerald-600 mt-1">
-                {assignedProgress.totalCredits} credits × ${ESTIMATED_TUITION_PER_CREDIT}/credit
+
+              <div className="text-center sm:text-left">
+                <label htmlFor="student-count" className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">
+                  Students in Class
+                </label>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <input
+                    id="student-count"
+                    type="number"
+                    min={1}
+                    max={2000}
+                    value={studentCount}
+                    onChange={(e) => setStudentCount(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                    className="w-20 rounded border border-emerald-300 px-2 py-1.5 text-sm text-center font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <input
+                    type="range"
+                    min={10}
+                    max={500}
+                    step={10}
+                    value={studentCount}
+                    onChange={(e) => setStudentCount(Number(e.target.value))}
+                    className="flex-grow accent-emerald-600 h-2"
+                  />
+                </div>
+              </div>
+
+              <div className="text-center sm:text-left">
+                <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">School-Wide Impact</div>
+                <div className="text-3xl font-black text-emerald-800 mt-1">
+                  ${(estimatedParentSavings * studentCount).toLocaleString()}
+                </div>
+                <div className="text-xs text-emerald-600 mt-1">total family savings across {studentCount} students</div>
               </div>
             </div>
 
-            <div className="hidden sm:block w-px h-16 bg-emerald-200 flex-shrink-0" />
-
-            <div className="flex-grow text-center sm:text-left">
-              <label htmlFor="student-count" className="text-xs font-semibold text-emerald-800">
-                Students in graduating class
-              </label>
-              <div className="flex items-center gap-3 mt-1.5">
-                <input
-                  id="student-count"
-                  type="number"
-                  min={1}
-                  max={2000}
-                  value={studentCount}
-                  onChange={(e) => setStudentCount(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
-                  className="w-20 rounded border border-emerald-300 px-2 py-1.5 text-sm text-center font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-                <input
-                  type="range"
-                  min={10}
-                  max={500}
-                  step={10}
-                  value={studentCount}
-                  onChange={(e) => setStudentCount(Number(e.target.value))}
-                  className="flex-grow accent-emerald-600 h-2"
-                />
+            <div className="mt-4 pt-4 border-t border-emerald-200 flex flex-col sm:flex-row items-center gap-3">
+              <div className="flex-grow text-sm text-emerald-800">
+                <span className="font-semibold">Board-ready summary:</span> By offering concurrent enrollment pathways, our school can save families an estimated <strong>${(estimatedParentSavings * studentCount).toLocaleString()}</strong> per graduating class while students earn up to <strong>{assignedProgress.totalCredits}</strong> college credits before graduation.
               </div>
-              <div className="mt-2">
-                <div className="text-2xl font-black text-emerald-800">
-                  ${(estimatedParentSavings * studentCount).toLocaleString()}
-                </div>
-                <div className="text-[11px] text-emerald-600">estimated school-wide savings</div>
-              </div>
-              <div className="text-[11px] text-emerald-500 italic mt-1">Use this number in your board presentation</div>
+              <button
+                onClick={() => {
+                  const summary = `By offering concurrent enrollment pathways, our school can save families an estimated $${(estimatedParentSavings * studentCount).toLocaleString()} per graduating class (${studentCount} students × $${estimatedParentSavings.toLocaleString()} each) while students earn up to ${assignedProgress.totalCredits} college credits before graduation.`;
+                  navigator.clipboard.writeText(summary).then(() => {
+                    setCopiedSavings(true);
+                    setTimeout(() => setCopiedSavings(false), 2500);
+                  });
+                }}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors flex-shrink-0 ${
+                  copiedSavings
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                }`}
+              >
+                {copiedSavings ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copiedSavings ? 'Copied!' : 'Copy for Board'}
+              </button>
             </div>
           </div>
         </div>
@@ -1655,9 +1685,29 @@ const App: React.FC = () => {
         </div>
 
         <div className="bg-slate-900 rounded-xl shadow-md border border-slate-800 px-5 py-4 text-white">
-          <div className="text-sm font-semibold text-orange-300 uppercase tracking-wider">Implementation Promise</div>
-          <div className="mt-1 text-sm text-slate-200">
-            Provide your two CSV files and we can configure a school-branded version of this planner in 48 hours.
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-grow">
+              <div className="text-sm font-semibold text-orange-300 uppercase tracking-wider">Ready to Launch at Your School?</div>
+              <div className="mt-1 text-sm text-slate-200">
+                Send us your CSV and we'll deliver a school-branded planner site in 48 hours. <span className="text-slate-400">$400 one-time setup.</span>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => setIsImporterOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white px-4 py-2.5 text-sm font-bold transition-colors shadow-sm"
+              >
+                <Upload className="w-4 h-4" />
+                Upload CSV
+              </button>
+              <a
+                href="mailto:implementation@schoolplanner.app?subject=School%20Planner%20Setup%20-%20$400"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 hover:border-slate-500 text-slate-200 hover:text-white px-4 py-2.5 text-sm font-semibold transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+                Contact Us
+              </a>
+            </div>
           </div>
         </div>
 
@@ -2364,75 +2414,139 @@ const App: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                            <div className="px-3 py-2.5" style={{ backgroundColor: selectedPreviewTheme.accentHex }}>
-                              <input
-                                type="text"
-                                value={previewSchoolName}
-                                onChange={(e) => setPreviewSchoolName(e.target.value)}
-                                placeholder="Your School"
-                                className="bg-transparent text-white text-sm font-bold w-full outline-none placeholder-white/50 border-b border-white/20 pb-0.5"
-                              />
-                              <div className="text-white/70 text-[11px] mt-0.5">Associate Degree Planner</div>
+                          <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                            <Star className="w-3.5 h-3.5 text-amber-500" />
+                            Live preview of your school's planner
+                          </div>
+                          <div className="rounded-xl border border-slate-200 overflow-hidden shadow-lg">
+                            {/* Mini app header */}
+                            <div className="px-4 py-3" style={{ backgroundColor: selectedPreviewTheme.accentHex }}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                                  <GraduationCap className="w-3.5 h-3.5 text-white" />
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    value={previewSchoolName}
+                                    onChange={(e) => setPreviewSchoolName(e.target.value)}
+                                    placeholder="Your School"
+                                    className="bg-transparent text-white text-sm font-bold w-full outline-none placeholder-white/50"
+                                  />
+                                  <div className="text-white/60 text-[10px] leading-tight">Associate Degree Planner &middot; WSU Partnership</div>
+                                </div>
+                              </div>
                             </div>
+                            {/* Mini pathway tabs */}
                             {importStatus.state === 'ok' && importStatus.pathways.length > 0 && (
-                              <div className="flex gap-1 px-2 py-1.5" style={{ backgroundColor: `${selectedPreviewTheme.accentHex}dd` }}>
+                              <div className="flex gap-0.5 px-2 py-1.5" style={{ backgroundColor: `${selectedPreviewTheme.accentHex}ee` }}>
                                 {importStatus.pathways.slice(0, 4).map((pw) => (
                                   <span
                                     key={pw.code}
-                                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                    className={`text-[9px] font-medium px-2 py-0.5 rounded-full transition-colors ${
                                       pw.code === selectedPreviewPathwayCode
-                                        ? 'bg-white font-semibold'
-                                        : 'bg-white/20 text-white/80'
+                                        ? 'bg-white font-bold shadow-sm'
+                                        : 'bg-white/15 text-white/80'
                                     }`}
                                     style={pw.code === selectedPreviewPathwayCode ? { color: selectedPreviewTheme.accentHex } : undefined}
                                   >
                                     {pw.name}
                                   </span>
                                 ))}
+                                {importStatus.pathways.length > 4 && (
+                                  <span className="text-[9px] text-white/50 px-1 py-0.5">+{importStatus.pathways.length - 4}</span>
+                                )}
                               </div>
                             )}
-                            <div className="bg-white p-3 space-y-2">
+                            {/* Mini dashboard area */}
+                            <div className="bg-gray-50 p-3 space-y-2.5">
                               {selectedPreviewPathway && (
-                                <div className="text-sm font-semibold" style={{ color: selectedPreviewTheme.accentHex }}>
-                                  {selectedPreviewPathway.name}
+                                <div className="text-xs font-bold" style={{ color: selectedPreviewTheme.accentHex }}>
+                                  {selectedPreviewPathway.name} Roadmap
                                 </div>
                               )}
-                              {['Grade 10', 'Grade 11', 'Grade 12'].map((grade) => (
-                                <div key={grade}>
-                                  <div className="text-[10px] font-semibold text-slate-500 mb-1">{grade}</div>
-                                  <div className="flex gap-1.5">
-                                    <div className="h-2 rounded bg-slate-200" style={{ width: '4rem' }} />
-                                    <div className="h-2 rounded bg-slate-200" style={{ width: '5rem' }} />
-                                    <div className="h-2 rounded bg-slate-100" style={{ width: '3rem' }} />
-                                  </div>
+                              {/* Mini progress bar */}
+                              <div className="flex items-center gap-2">
+                                <div className="flex-grow h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: '65%', backgroundColor: selectedPreviewTheme.accentHex }} />
                                 </div>
-                              ))}
-                              <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                                {importStatus.state === 'ok' ? importStatus.previewRowCount : 0} courses loaded &middot; {selectedPreviewTheme.label} theme
+                                <span className="text-[9px] font-bold text-slate-500">39/60 cr</span>
+                              </div>
+                              {/* Mini grade columns */}
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {['Sophomore', 'Junior', 'Senior'].map((grade, gi) => (
+                                  <div key={grade} className="rounded border border-slate-200 bg-white p-1.5">
+                                    <div className="text-[8px] font-bold text-slate-600 mb-1 pb-0.5 border-b" style={{ borderColor: `${selectedPreviewTheme.accentHex}40` }}>{grade}</div>
+                                    {[0, 1, 2].map((ci) => (
+                                      <div key={ci} className="flex items-center gap-1 mb-0.5">
+                                        <div
+                                          className="h-1.5 rounded"
+                                          style={{
+                                            width: `${50 + (gi * 10) + (ci * 8)}%`,
+                                            backgroundColor: ci === 0 ? `${selectedPreviewTheme.accentHex}30` : '#e2e8f0',
+                                          }}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Mini savings callout */}
+                              <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5 flex items-center justify-between">
+                                <span className="text-[9px] font-semibold text-emerald-700">Est. Savings</span>
+                                <span className="text-[10px] font-black text-emerald-800">$4,680</span>
+                              </div>
+                              <div className="text-[9px] text-slate-400 pt-1 border-t border-slate-100 flex items-center justify-between">
+                                <span>{importStatus.state === 'ok' ? importStatus.previewRowCount : 0} courses &middot; {selectedPreviewTheme.label}</span>
+                                <span className="font-semibold" style={{ color: selectedPreviewTheme.accentHex }}>yourschool.plannerapp.com</span>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                      <div className="mt-3 rounded border border-blue-200 bg-white p-3 text-slate-800">
-                        <div className="text-sm font-semibold text-blue-900">Unlock full import + website launch for $100</div>
-                        <p className="text-xs text-slate-600 mt-1">
-                          Upgrade unlocks all pathways, all CSV rows, and a school-branded planner page ready for counselors, students, and families.
-                        </p>
-                        <div className="mt-2 flex flex-col sm:flex-row gap-2">
-                          <a
-                            href="mailto:implementation@schoolplanner.app?subject=Unlock%20Full%20Import%20and%20Website%20Launch%20($100)"
-                            className="inline-flex items-center justify-center rounded bg-blue-700 text-white px-3 py-2 text-xs font-semibold hover:bg-blue-600 transition-colors"
-                          >
-                            Unlock Full Features ($100)
-                          </a>
-                          <a
-                            href="mailto:implementation@schoolplanner.app?subject=15-minute%20School%20Planner%20Setup%20Call"
-                            className="inline-flex items-center justify-center rounded border border-slate-300 bg-white text-slate-700 px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors"
-                          >
-                            Book 15-Min Setup Call
-                          </a>
+                      {/* Free vs Paid Comparison */}
+                      <div className="mt-3 rounded-xl border border-blue-200 bg-white overflow-hidden">
+                        <div className="text-xs font-bold text-center py-2 bg-blue-50 text-blue-900 uppercase tracking-wider">What Your School Gets</div>
+                        <div className="grid grid-cols-2 divide-x divide-blue-100">
+                          <div className="p-3">
+                            <div className="text-xs font-bold text-slate-500 uppercase mb-2">Free Preview</div>
+                            <ul className="space-y-1.5 text-[11px] text-slate-600">
+                              <li className="flex items-start gap-1.5"><Check className="w-3 h-3 text-green-500 mt-0.5 shrink-0" /> 1 pathway preview</li>
+                              <li className="flex items-start gap-1.5"><Check className="w-3 h-3 text-green-500 mt-0.5 shrink-0" /> First 25 rows</li>
+                              <li className="flex items-start gap-1.5"><Check className="w-3 h-3 text-green-500 mt-0.5 shrink-0" /> 8 color schemes</li>
+                              <li className="flex items-start gap-1.5"><Lock className="w-3 h-3 text-slate-300 mt-0.5 shrink-0" /> <span className="text-slate-400">Remaining rows locked</span></li>
+                              <li className="flex items-start gap-1.5"><Lock className="w-3 h-3 text-slate-300 mt-0.5 shrink-0" /> <span className="text-slate-400">No branded site</span></li>
+                            </ul>
+                          </div>
+                          <div className="p-3 bg-blue-50/50">
+                            <div className="text-xs font-bold text-blue-800 uppercase mb-2 flex items-center gap-1">
+                              <Star className="w-3 h-3 text-amber-500" /> Full Launch — $400
+                            </div>
+                            <ul className="space-y-1.5 text-[11px] text-slate-700">
+                              <li className="flex items-start gap-1.5"><Unlock className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" /> <strong>All pathways</strong> unlocked</li>
+                              <li className="flex items-start gap-1.5"><Unlock className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" /> <strong>All CSV rows</strong> imported</li>
+                              <li className="flex items-start gap-1.5"><Unlock className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" /> School-branded <strong>planner site</strong></li>
+                              <li className="flex items-start gap-1.5"><Unlock className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" /> <strong>PDF export</strong> for families</li>
+                              <li className="flex items-start gap-1.5"><Unlock className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" /> <strong>48-hour</strong> setup turnaround</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <a
+                              href="mailto:implementation@schoolplanner.app?subject=Unlock%20Full%20Import%20and%20Website%20Launch%20($400)"
+                              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-white text-blue-700 px-4 py-2.5 text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm"
+                            >
+                              Get Your School Set Up
+                              <ArrowRight className="w-4 h-4" />
+                            </a>
+                            <a
+                              href="mailto:implementation@schoolplanner.app?subject=15-minute%20School%20Planner%20Setup%20Call"
+                              className="flex-1 inline-flex items-center justify-center rounded-lg border border-white/30 text-white px-4 py-2.5 text-sm font-semibold hover:bg-white/10 transition-colors"
+                            >
+                              Schedule a 15-Min Call
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
