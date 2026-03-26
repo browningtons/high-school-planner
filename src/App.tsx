@@ -469,6 +469,8 @@ const App: React.FC = () => {
   const [catalogAssignCourseId, setCatalogAssignCourseId] = useState<string | null>(null);
   const [studentCount, setStudentCount] = useState(50);
   const [copiedSavings, setCopiedSavings] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<'savings' | 'quickstart' | 'playbook' | null>(null);
+  const [playbookHighlight, setPlaybookHighlight] = useState<string | null>(null);
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('counselor_setup_step_ids');
@@ -923,6 +925,22 @@ const App: React.FC = () => {
     setActiveDropZone(null);
     setLastAppliedMove(null);
   }, [selectedPathId]);
+
+  const handlePlaybookNavigate = (sectionId: string) => {
+    setPlaybookHighlight(sectionId);
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handlePlaybookReturn = () => {
+    setPlaybookHighlight(null);
+    const el = document.getElementById('counselor-tools');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const handleDownloadPdf = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
@@ -1472,7 +1490,7 @@ const App: React.FC = () => {
           </div>
           
           {/* Action Bar: Path Selectors ONLY - Single Row */}
-          <div className="mt-8 pt-6 border-t border-white/10">
+          <div id="section-pathway-tabs" className={`mt-8 pt-6 border-t border-white/10 scroll-mt-4 rounded-xl transition-shadow ${playbookHighlight === 'section-pathway-tabs' ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-900' : ''}`}>
             <div className="flex flex-nowrap gap-3 w-full overflow-x-auto md:overflow-visible pb-2 md:pb-0">
               {SKILL_PATHS.map(path => {
                 const Icon = path.icon;
@@ -1555,164 +1573,213 @@ const App: React.FC = () => {
 	            </div>
 	        </div>
 
-        {/* SECTION: SCHOOL-WIDE ROI CALCULATOR */}
-        <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-xl shadow-md border border-emerald-200 overflow-hidden">
-          <div className="px-5 py-3 bg-emerald-800 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-emerald-200" />
-            <span className="text-sm font-bold text-white">School-Wide ROI Calculator</span>
-            <span className="ml-auto text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Share with your board</span>
-          </div>
-          <div className="p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div className="text-center sm:text-left">
-                <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">Per-Student Savings</div>
-                <div className="text-3xl font-black text-emerald-800 mt-1">
-                  ${estimatedParentSavings.toLocaleString()}
-                </div>
-                <div className="text-xs text-emerald-600 mt-1">
-                  {assignedProgress.totalCredits} credits × ${ESTIMATED_TUITION_PER_CREDIT}/credit
-                </div>
-              </div>
+        {/* SECTION: COUNSELOR TOOLS -- compact 3-column row */}
+        <div id="counselor-tools" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-              <div className="text-center sm:text-left">
-                <label htmlFor="student-count" className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">
-                  Students in Class
-                </label>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <input
-                    id="student-count"
-                    type="number"
-                    min={1}
-                    max={2000}
-                    value={studentCount}
-                    onChange={(e) => setStudentCount(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
-                    className="w-20 rounded border border-emerald-300 px-2 py-1.5 text-sm text-center font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <input
-                    type="range"
-                    min={10}
-                    max={500}
-                    step={10}
-                    value={studentCount}
-                    onChange={(e) => setStudentCount(Number(e.target.value))}
-                    className="flex-grow accent-emerald-600 h-2"
-                  />
-                </div>
+          {/* Card 1: Savings Calculator */}
+          <div className="bg-white rounded-xl shadow-md border border-emerald-200 overflow-hidden flex flex-col">
+            <div className="px-4 py-3 bg-emerald-800 flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-200" />
+              <span className="text-sm font-bold text-white">Savings Calculator</span>
+              <button
+                onClick={() => setExpandedCard(expandedCard === 'savings' ? null : 'savings')}
+                className="ml-auto p-1 rounded hover:bg-white/10 transition-colors"
+                title={expandedCard === 'savings' ? 'Collapse' : 'Expand for details'}
+              >
+                {expandedCard === 'savings'
+                  ? <ChevronUp className="w-3.5 h-3.5 text-emerald-200" />
+                  : <ChevronDown className="w-3.5 h-3.5 text-emerald-200" />
+                }
+              </button>
+            </div>
+            <div className="p-4 bg-gradient-to-b from-emerald-50 to-white flex-grow">
+              {/* Always visible: key numbers */}
+              <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">Per-Student Savings</div>
+              <div className="text-2xl font-black text-emerald-800 mt-0.5">
+                ${estimatedParentSavings.toLocaleString()}
               </div>
-
-              <div className="text-center sm:text-left">
-                <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">School-Wide Impact</div>
-                <div className="text-3xl font-black text-emerald-800 mt-1">
+              <div className="text-xs text-emerald-600 mt-0.5">
+                {assignedProgress.totalCredits} credits × ${ESTIMATED_TUITION_PER_CREDIT}/cr
+              </div>
+              <div className="mt-3 pt-3 border-t border-emerald-100">
+                <div className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">School-Wide ({studentCount} students)</div>
+                <div className="text-xl font-black text-emerald-800 mt-0.5">
                   ${(estimatedParentSavings * studentCount).toLocaleString()}
                 </div>
-                <div className="text-xs text-emerald-600 mt-1">total family savings across {studentCount} students</div>
               </div>
-            </div>
 
-            <div className="mt-4 pt-4 border-t border-emerald-200 flex flex-col sm:flex-row items-center gap-3">
-              <div className="flex-grow text-sm text-emerald-800">
-                <span className="font-semibold">Board-ready summary:</span> By offering concurrent enrollment pathways, our school can save families an estimated <strong>${(estimatedParentSavings * studentCount).toLocaleString()}</strong> per graduating class while students earn up to <strong>{assignedProgress.totalCredits}</strong> college credits before graduation.
+              {/* Expanded: slider, board summary, copy */}
+              {expandedCard === 'savings' && (
+                <div className="mt-4 pt-4 border-t border-emerald-200 space-y-4 animate-[fadeSlideIn_0.2s_ease-out]">
+                  <div>
+                    <label htmlFor="student-count" className="text-xs font-semibold text-emerald-800">
+                      Adjust class size
+                    </label>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <input
+                        id="student-count"
+                        type="number"
+                        min={1}
+                        max={2000}
+                        value={studentCount}
+                        onChange={(e) => setStudentCount(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                        className="w-16 rounded border border-emerald-300 px-2 py-1 text-sm text-center font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                      <input
+                        type="range"
+                        min={10}
+                        max={500}
+                        step={10}
+                        value={studentCount}
+                        onChange={(e) => setStudentCount(Number(e.target.value))}
+                        className="flex-grow accent-emerald-600 h-2"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-emerald-800 leading-relaxed">
+                    <span className="font-semibold">Board-ready:</span> Our school can save families <strong>${(estimatedParentSavings * studentCount).toLocaleString()}</strong> per class while students earn <strong>{assignedProgress.totalCredits}</strong> college credits before graduation.
+                  </div>
+                  <button
+                    onClick={() => {
+                      const summary = `By offering concurrent enrollment pathways, our school can save families an estimated $${(estimatedParentSavings * studentCount).toLocaleString()} per graduating class (${studentCount} students × $${estimatedParentSavings.toLocaleString()} each) while students earn up to ${assignedProgress.totalCredits} college credits before graduation.`;
+                      navigator.clipboard.writeText(summary).then(() => {
+                        setCopiedSavings(true);
+                        setTimeout(() => setCopiedSavings(false), 2500);
+                      });
+                    }}
+                    className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                      copiedSavings
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {copiedSavings ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedSavings ? 'Copied!' : 'Copy Summary for Board'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 2: Counselor Quick Start */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-4 py-3 bg-slate-800 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-orange-300" />
+              <span className="text-sm font-bold text-white">Quick Start</span>
+              <span className="ml-auto flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-300 font-medium">{completedSetupCount}/{COUNSELOR_SETUP_STEPS.length}</span>
+                <button
+                  onClick={() => setExpandedCard(expandedCard === 'quickstart' ? null : 'quickstart')}
+                  className="p-1 rounded hover:bg-white/10 transition-colors"
+                  title={expandedCard === 'quickstart' ? 'Collapse' : 'Expand for details'}
+                >
+                  {expandedCard === 'quickstart'
+                    ? <ChevronUp className="w-3.5 h-3.5 text-slate-300" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-slate-300" />
+                  }
+                </button>
+              </span>
+            </div>
+            <div className="p-4 flex-grow">
+              {/* Always visible: progress bar + summary */}
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                <div
+                  className="h-2 rounded-full bg-orange-500 transition-all duration-500"
+                  style={{ width: `${(completedSetupCount / COUNSELOR_SETUP_STEPS.length) * 100}%` }}
+                />
               </div>
+              <div className="text-sm text-gray-700">
+                {completedSetupCount === COUNSELOR_SETUP_STEPS.length
+                  ? <span className="font-semibold text-green-700">All steps complete</span>
+                  : <span>{COUNSELOR_SETUP_STEPS.length - completedSetupCount} step{COUNSELOR_SETUP_STEPS.length - completedSetupCount !== 1 ? 's' : ''} remaining</span>
+                }
+              </div>
+              <p className="text-xs text-gray-500 mt-1">20-minute onboarding checklist for counselors.</p>
+
+              {/* Expanded: full checklist */}
+              {expandedCard === 'quickstart' && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-2.5 animate-[fadeSlideIn_0.2s_ease-out]">
+                  {COUNSELOR_SETUP_STEPS.map((step) => {
+                    const checked = completedSetupStepIds.includes(step.id);
+                    return (
+                      <label key={step.id} className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 accent-orange-600"
+                          checked={checked}
+                          onChange={() => handleToggleSetupStep(step.id)}
+                        />
+                        <span className={checked ? 'line-through text-gray-400' : ''}>{step.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 3: Counselor Playbook */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-4 py-3 bg-blue-800 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-200" />
+              <span className="text-sm font-bold text-white">Counselor Playbook</span>
               <button
-                onClick={() => {
-                  const summary = `By offering concurrent enrollment pathways, our school can save families an estimated $${(estimatedParentSavings * studentCount).toLocaleString()} per graduating class (${studentCount} students × $${estimatedParentSavings.toLocaleString()} each) while students earn up to ${assignedProgress.totalCredits} college credits before graduation.`;
-                  navigator.clipboard.writeText(summary).then(() => {
-                    setCopiedSavings(true);
-                    setTimeout(() => setCopiedSavings(false), 2500);
-                  });
-                }}
-                className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors flex-shrink-0 ${
-                  copiedSavings
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100'
-                }`}
+                onClick={() => setExpandedCard(expandedCard === 'playbook' ? null : 'playbook')}
+                className="ml-auto p-1 rounded hover:bg-white/10 transition-colors"
+                title={expandedCard === 'playbook' ? 'Collapse' : 'Expand for details'}
               >
-                {copiedSavings ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copiedSavings ? 'Copied!' : 'Copy for Board'}
+                {expandedCard === 'playbook'
+                  ? <ChevronUp className="w-3.5 h-3.5 text-blue-200" />
+                  : <ChevronDown className="w-3.5 h-3.5 text-blue-200" />
+                }
               </button>
             </div>
-          </div>
-        </div>
+            <div className="p-4 flex-grow">
+              {/* Always visible: 3 phases as compact pills */}
+              <p className="text-xs text-gray-500 mb-3">3-phase meeting script for student signup.</p>
+              <div className="space-y-1.5">
+                {[
+                  { label: 'Phase 1: Confirm Goals', section: 'section-pathway-tabs', tip: 'Start here -- help the student pick a pathway' },
+                  { label: 'Phase 2: Build the Plan', section: 'section-roadmap', tip: 'Drag courses into Grade 10-12' },
+                  { label: 'Phase 3: Family Readiness', section: 'section-meeting-prep', tip: 'Review savings, parent questions, talking points' },
+                ].map((phase) => (
+                  <div key={phase.section} className="flex items-center gap-2 text-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                    <span className="font-medium text-gray-800">{phase.label}</span>
+                  </div>
+                ))}
+              </div>
 
-        {/* SECTION: COUNSELOR ONBOARDING + PLAYBOOK */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Quick Start (20 Minutes)</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Follow this quick-start checklist to onboard a school counselor workflow.
-            </p>
-            <div className="text-xs text-gray-500 mb-3">
-              Progress: {completedSetupCount}/{COUNSELOR_SETUP_STEPS.length} complete
-            </div>
-            <div className="space-y-2">
-              {COUNSELOR_SETUP_STEPS.map((step) => {
-                const checked = completedSetupStepIds.includes(step.id);
-                return (
-                  <label key={step.id} className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 accent-orange-600"
-                      checked={checked}
-                      onChange={() => handleToggleSetupStep(step.id)}
-                    />
-                    <span className={checked ? 'line-through text-gray-400' : ''}>{step.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Counselor Playbook</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Use this meeting script when guiding students through signup.
-            </p>
-            <div className="space-y-3 text-sm">
-              <div className="bg-gray-50 border border-gray-200 rounded p-3">
-                <div className="font-semibold text-gray-900">Phase 1: Confirm Goals</div>
-                <div className="text-gray-600 mt-1">“Which pathway fits your post-high-school plan best?”</div>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded p-3">
-                <div className="font-semibold text-gray-900">Phase 2: Build the Year Plan</div>
-                <div className="text-gray-600 mt-1">“Drag classes into Grade 10-12, then review credits and requirements.”</div>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded p-3">
-                <div className="font-semibold text-gray-900">Phase 3: Family Readiness</div>
-                <div className="text-gray-600 mt-1">“Review parent questions, savings estimate, and next recommended course.”</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-900 rounded-xl shadow-md border border-slate-800 px-5 py-4 text-white">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="flex-grow">
-              <div className="text-sm font-semibold text-orange-300 uppercase tracking-wider">Ready to Launch at Your School?</div>
-              <div className="mt-1 text-sm text-slate-200">
-                Send us your CSV and we'll deliver a school-branded planner site in 48 hours.
-              </div>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button
-                onClick={() => setIsImporterOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white px-4 py-2.5 text-sm font-bold transition-colors shadow-sm"
-              >
-                <Upload className="w-4 h-4" />
-                Upload CSV
-              </button>
-              <a
-                href="mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%20Call"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 hover:border-slate-500 text-slate-200 hover:text-white px-4 py-2.5 text-sm font-semibold transition-colors"
-              >
-                <Mail className="w-4 h-4" />
-                Contact Us
-              </a>
+              {/* Expanded: clickable phase cards with navigation */}
+              {expandedCard === 'playbook' && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-2.5 animate-[fadeSlideIn_0.2s_ease-out]">
+                  <p className="text-xs text-gray-600 mb-2">Click a phase to jump to that section. A callout will appear so you can find your way back.</p>
+                  {[
+                    { label: 'Phase 1: Confirm Goals', section: 'section-pathway-tabs', script: '"Which pathway fits your post-high-school plan best?"', detail: 'Use the pathway tabs above to explore options with the student.' },
+                    { label: 'Phase 2: Build the Year Plan', section: 'section-roadmap', script: '"Let\'s drag your classes into each grade."', detail: 'Use the roadmap to assign courses, then check credits and requirements.' },
+                    { label: 'Phase 3: Family Readiness', section: 'section-meeting-prep', script: '"Here\'s what to share with your family."', detail: 'Review the savings estimate, parent questions, and counselor talking points.' },
+                  ].map((phase) => (
+                    <button
+                      key={phase.section}
+                      onClick={() => handlePlaybookNavigate(phase.section)}
+                      className="w-full text-left bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-3 transition-colors group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-sm text-blue-900">{phase.label}</div>
+                        <ArrowRight className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-600 transition-colors" />
+                      </div>
+                      <div className="text-xs text-blue-700 mt-1 italic">{phase.script}</div>
+                      <div className="text-xs text-blue-600 mt-1">{phase.detail}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
 	        {/* SECTION 2: YEARLY ROADMAP */}
-        <div>
+        <div id="section-roadmap" className={`scroll-mt-4 rounded-xl transition-shadow ${playbookHighlight === 'section-roadmap' ? 'ring-2 ring-blue-400 ring-offset-4' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
             <div className="flex gap-2">
@@ -1985,7 +2052,7 @@ const App: React.FC = () => {
 	                </div>
 	              </div>
 
-	              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+	              <div id="section-meeting-prep" className={`bg-white rounded-xl shadow-md border border-gray-200 p-5 scroll-mt-4 transition-shadow ${playbookHighlight === 'section-meeting-prep' ? 'ring-2 ring-blue-400 ring-offset-4' : ''}`}>
 	                <h3 className="text-lg font-bold text-gray-900 mb-1">After Planning: Parent Meeting Prep</h3>
 	                <p className="text-sm text-gray-600 mb-4">
 	                  Use this after the course placements are in a good spot.
@@ -2192,6 +2259,29 @@ const App: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Playbook highlight banner -- floating at top when a section is active */}
+      {playbookHighlight && (
+        <div className="fixed top-0 left-0 right-0 z-40 bg-blue-700 text-white shadow-lg animate-[fadeSlideIn_0.2s_ease-out]">
+          <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-200" />
+              <span className="text-sm font-semibold">
+                {playbookHighlight === 'section-pathway-tabs' && 'Phase 1: Help the student pick a pathway using the tabs below'}
+                {playbookHighlight === 'section-roadmap' && 'Phase 2: Drag courses into Grade 10-12, then check credits'}
+                {playbookHighlight === 'section-meeting-prep' && 'Phase 3: Review savings and parent questions below'}
+              </span>
+            </div>
+            <button
+              onClick={handlePlaybookReturn}
+              className="flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-semibold transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              Back to Playbook
+            </button>
+          </div>
+        </div>
+      )}
 
       {catalogAssignCourseId && catalogAssignCourse && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
