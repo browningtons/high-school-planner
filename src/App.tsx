@@ -1689,7 +1689,7 @@ const App: React.FC = () => {
             <div className="flex-grow">
               <div className="text-sm font-semibold text-orange-300 uppercase tracking-wider">Ready to Launch at Your School?</div>
               <div className="mt-1 text-sm text-slate-200">
-                Send us your CSV and we'll deliver a school-branded planner site in 48 hours. <span className="text-slate-400">$400 one-time setup.</span>
+                Send us your CSV and we'll deliver a school-branded planner site in 48 hours.
               </div>
             </div>
             <div className="flex gap-2 flex-shrink-0">
@@ -1701,7 +1701,7 @@ const App: React.FC = () => {
                 Upload CSV
               </button>
               <a
-                href="mailto:implementation@schoolplanner.app?subject=School%20Planner%20Setup%20-%20$400"
+                href="mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%20Call"
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-600 hover:border-slate-500 text-slate-200 hover:text-white px-4 py-2.5 text-sm font-semibold transition-colors"
               >
                 <Mail className="w-4 h-4" />
@@ -2520,7 +2520,7 @@ const App: React.FC = () => {
                           </div>
                           <div className="p-3 bg-blue-50/50">
                             <div className="text-xs font-bold text-blue-800 uppercase mb-2 flex items-center gap-1">
-                              <Star className="w-3 h-3 text-amber-500" /> Full Launch — $400
+                              <Star className="w-3 h-3 text-amber-500" /> Full Launch
                             </div>
                             <ul className="space-y-1.5 text-[11px] text-slate-700">
                               <li className="flex items-start gap-1.5"><Unlock className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" /> <strong>All pathways</strong> unlocked</li>
@@ -2532,21 +2532,13 @@ const App: React.FC = () => {
                           </div>
                         </div>
                         <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600">
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <a
-                              href="mailto:implementation@schoolplanner.app?subject=Unlock%20Full%20Import%20and%20Website%20Launch%20($400)"
-                              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-white text-blue-700 px-4 py-2.5 text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm"
-                            >
-                              Get Your School Set Up
-                              <ArrowRight className="w-4 h-4" />
-                            </a>
-                            <a
-                              href="mailto:implementation@schoolplanner.app?subject=15-minute%20School%20Planner%20Setup%20Call"
-                              className="flex-1 inline-flex items-center justify-center rounded-lg border border-white/30 text-white px-4 py-2.5 text-sm font-semibold hover:bg-white/10 transition-colors"
-                            >
-                              Schedule a 15-Min Call
-                            </a>
-                          </div>
+                          <a
+                            href="mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%20Call"
+                            className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-white text-blue-700 px-4 py-2.5 text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm"
+                          >
+                            Schedule a 15-Min Call
+                            <ArrowRight className="w-4 h-4" />
+                          </a>
                         </div>
                       </div>
                     </div>
