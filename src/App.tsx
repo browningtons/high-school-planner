@@ -1007,7 +1007,7 @@ const App: React.FC = () => {
     rect(0, headerH - 3, pageW, 3, orange500);
 
     // Header text
-    text('OGDEN SCHOOL DISTRICT  •  WSU', ml, 28, 8, 'bold', orange200);
+    text(`${(previewSchoolName || 'Your School').toUpperCase()}  •  COLLEGE CREDIT PLANNER`, ml, 28, 8, 'bold', orange200);
     text('Student Course Roadmap', ml, 48, 18, 'bold', white);
     text(`${selectedPath.name}`, ml, 64, 11, 'normal', [203, 213, 225]); // slate-300
 
@@ -1186,7 +1186,7 @@ const App: React.FC = () => {
     const footerY = 760;
     doc.setDrawColor(229, 231, 235);
     doc.line(ml, footerY, ml + pw, footerY);
-    text('Ogden School District • Weber State University', ml, footerY + 12, 7, 'normal', gray400);
+    text(`${previewSchoolName || 'Your School'} • College Credit Planner`, ml, footerY + 12, 7, 'normal', gray400);
     text(dateStr, ml + pw - 80, footerY + 12, 7, 'normal', gray400);
 
     doc.save(`roadmap-${selectedPath.id}.pdf`);
@@ -1365,7 +1365,7 @@ const App: React.FC = () => {
       >
         <div className={`absolute top-0 right-0 px-2 py-0.5 text-[9px] font-bold uppercase rounded-bl-lg
           ${isResidency ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-700'}`}>
-          {isResidency ? 'WSU CE' : course.type}
+          {isResidency ? 'Univ CE' : course.type}
         </div>
 
         <div className="pr-12">
@@ -1444,7 +1444,7 @@ const App: React.FC = () => {
             <div className="flex-grow flex flex-col justify-center text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start space-x-3 mb-2">
                   <GraduationCap className="w-8 h-8" style={{ color: schoolColors[4] || '#fb923c' }} />
-                  <span className="font-semibold tracking-wider text-sm uppercase" style={{ color: `${schoolColors[4] || '#fb923c'}cc` }}>{previewSchoolName || 'Ogden School District'} &bull; WSU</span>
+                  <span className="font-semibold tracking-wider text-sm uppercase" style={{ color: `${schoolColors[4] || '#fb923c'}cc` }}>{previewSchoolName || 'Your School'} &bull; College Credit Planner</span>
                 </div>
                 <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight text-white mb-3">
                   Earn Your Associate's Degree in High School
@@ -1468,7 +1468,7 @@ const App: React.FC = () => {
 	                      <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
 	                        <li><strong>60 Total</strong> Credit Hours</li>
 	                        <li>1 course from EACH Gen Ed category</li>
-	                        <li><strong>20 Credits</strong> from WSU (CE)</li>
+	                        <li><strong>20 Credits</strong> from your local university (CE)</li>
 	                        <li>AP/IB credits count only after passing exams</li>
 	                        <li>1 Cultural Competence course (*)</li>
 	                      </ul>
@@ -2539,7 +2539,7 @@ const App: React.FC = () => {
                                     placeholder="Your School"
                                     className="bg-transparent text-white text-sm font-bold w-full outline-none placeholder-white/50"
                                   />
-                                  <div className="text-white/60 text-[10px] leading-tight">Associate Degree Planner &middot; WSU Partnership</div>
+                                  <div className="text-white/60 text-[10px] leading-tight">College Credit Planner &middot; University &amp; AP Credits</div>
                                 </div>
                               </div>
                             </div>
