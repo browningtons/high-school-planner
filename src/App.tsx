@@ -1207,29 +1207,35 @@ const App: React.FC = () => {
     y = headerH + 20;
 
     // ── PROGRESS SUMMARY STRIP ──
-    const stripH = 56;
+    const stripH = 80;
     roundRect(ml, y, pw, stripH, 4, [249, 250, 251]); // gray-100
     doc.setDrawColor(229, 231, 235); // gray-200
     doc.roundedRect(ml, y, pw, stripH, 4, 4, 'S');
 
     // Three stat boxes across the strip
     const statW = pw / 3;
-    const statY = y + 16;
+    const statY = y + 14;
 
     // Credits
     text('Total Credits', ml + 14, statY, 8, 'bold', gray600);
     const credColor = assignedProgress.totalCredits >= 60 ? green600 : orange500;
     text(`${assignedProgress.totalCredits} / 60`, ml + 14, statY + 16, 14, 'bold', credColor);
+    text('60 credit hours required', ml + 14, statY + 30, 6.5, 'normal', gray400);
+    text('for associate degree', ml + 14, statY + 39, 6.5, 'normal', gray400);
 
     // Residency
     text('CE Residency', ml + statW + 14, statY, 8, 'bold', gray600);
     const resColor = assignedProgress.residencyCredits >= 20 ? green600 : orange500;
     text(`${assignedProgress.residencyCredits} / 20`, ml + statW + 14, statY + 16, 14, 'bold', resColor);
+    text('20 credits must come from', ml + statW + 14, statY + 30, 6.5, 'normal', gray400);
+    text('concurrent enrollment (CE)', ml + statW + 14, statY + 39, 6.5, 'normal', gray400);
 
     // Gen Ed
     text('Gen Ed Coverage', ml + statW * 2 + 14, statY, 8, 'bold', gray600);
     const genColor = assignedProgress.missingCategories.length === 0 ? green600 : orange500;
     text(`${assignedProgress.satisfiedCategories.size} / ${REQUIRED_CATEGORIES.length}`, ml + statW * 2 + 14, statY + 16, 14, 'bold', genColor);
+    text('1 course from each of 9', ml + statW * 2 + 14, statY + 30, 6.5, 'normal', gray400);
+    text('Gen Ed categories required', ml + statW * 2 + 14, statY + 39, 6.5, 'normal', gray400);
 
     // Vertical dividers
     doc.setDrawColor(220, 220, 220);
