@@ -82,11 +82,11 @@ interface ImportedPathwayOption {
 // --- DATA BASED ON PDF CONTENT ---
 
 const COUNSELORS: Counselor[] = [
-  { name: 'Ty Harlan', role: 'Ogden High Counselor', email: 'harlant@ogdensd.org', assignment: 'Last Names: A-Di' },
-  { name: 'Mark Allen', role: 'Ogden High Counselor', email: 'allenm@ogdensd.org', assignment: 'Last Names: Do-Lee' },
-  { name: 'Amy Green', role: 'Ogden High Counselor', email: 'greena@ogdensd.org', assignment: 'Last Names: Lei-Ri' },
-  { name: 'Catherine Sanchez', role: 'Ogden High Counselor', email: 'sanchezc@ogdensd.org', assignment: 'Last Names: Ro-Z' },
-  { name: 'Jacqueline Perez', role: 'Weber State Academic Advisor', email: 'jacquelineperez@weber.edu' },
+  { name: 'Sarah Johnson', role: 'School Counselor', email: 'counselor1@school.edu', assignment: 'Last Names: A-Di' },
+  { name: 'Michael Davis', role: 'School Counselor', email: 'counselor2@school.edu', assignment: 'Last Names: Do-Lee' },
+  { name: 'Rachel Thompson', role: 'School Counselor', email: 'counselor3@school.edu', assignment: 'Last Names: Lei-Ri' },
+  { name: 'David Martinez', role: 'School Counselor', email: 'counselor4@school.edu', assignment: 'Last Names: Ro-Z' },
+  { name: 'Jennifer Wilson', role: 'University Academic Advisor', email: 'advisor@university.edu' },
 ];
 
 const ALL_COURSES: HighSchoolCourse[] = [
