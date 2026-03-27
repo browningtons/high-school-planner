@@ -471,6 +471,8 @@ const App: React.FC = () => {
   const [copiedSavings, setCopiedSavings] = useState(false);
   const [expandedCard, setExpandedCard] = useState<'savings' | 'quickstart' | 'playbook' | null>(null);
   const [playbookHighlight, setPlaybookHighlight] = useState<string | null>(null);
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
+  const [schoolColors, setSchoolColors] = useState<string[]>(['#1e293b', '#ea580c', '#f8fafc', '#334155', '#fb923c']);
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('counselor_setup_step_ids');
@@ -487,6 +489,19 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('counselor_setup_step_ids', JSON.stringify(completedSetupStepIds));
   }, [completedSetupStepIds]);
+
+  // Apply school brand colors as CSS custom properties
+  useEffect(() => {
+    const root = document.documentElement;
+    schoolColors.forEach((hex, i) => {
+      root.style.setProperty(`--school-color-${i + 1}`, hex);
+    });
+    return () => {
+      schoolColors.forEach((_, i) => {
+        root.style.removeProperty(`--school-color-${i + 1}`);
+      });
+    };
+  }, [schoolColors]);
 
   useEffect(() => {
     if (!isImporterOpen) return;
@@ -1405,31 +1420,31 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-12">
-      {/* Top Banner (Solid Background) */}
-      <div className="bg-slate-900 text-white shadow-xl">
+      {/* Top Banner (Solid Background) — uses school primary color */}
+      <div className="text-white shadow-xl" style={{ backgroundColor: schoolColors[0] || '#1e293b' }}>
         <div className="max-w-6xl mx-auto p-6 md:p-8">
           
           <div className="flex flex-col md:flex-row gap-6">
-             {/* Logo Placeholder */}
+             {/* Logo — uses uploaded school logo or default tiger */}
             <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
-               <img 
-                  src="tiger-logo.png" 
-                  alt="Ogden Tiger" 
+               <img
+                  src={schoolLogoUrl || 'tiger-logo.png'}
+                  alt={`${previewSchoolName || 'School'} logo`}
                   className="w-full h-full object-contain p-1"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
-                  }} 
+                  }}
                />
                <div className="absolute inset-0 flex items-center justify-center text-white font-bold text-xs" style={{zIndex: -1}}>
-                  TIGER LOGO
+                  LOGO
                </div>
             </div>
 
             <div className="flex-grow flex flex-col justify-center text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start space-x-3 mb-2">
-                  <GraduationCap className="w-8 h-8 text-orange-400" />
-                  <span className="text-orange-200 font-semibold tracking-wider text-sm uppercase">Ogden School District • WSU</span>
+                  <GraduationCap className="w-8 h-8" style={{ color: schoolColors[4] || '#fb923c' }} />
+                  <span className="font-semibold tracking-wider text-sm uppercase" style={{ color: `${schoolColors[4] || '#fb923c'}cc` }}>{previewSchoolName || 'Ogden School District'} &bull; WSU</span>
                 </div>
                 <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight text-white mb-3">
                   Earn Your Associate's Degree in High School
@@ -1499,10 +1514,11 @@ const App: React.FC = () => {
                     key={path.id}
                     onClick={() => setSelectedPathId(path.id)}
                     className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all font-medium whitespace-nowrap ${
-                      selectedPathId === path.id 
-                        ? 'bg-orange-600 text-white shadow-lg scale-[1.02]' 
+                      selectedPathId === path.id
+                        ? 'text-white shadow-lg scale-[1.02]'
                         : 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
                     }`}
+                    style={selectedPathId === path.id ? { backgroundColor: schoolColors[1] || '#ea580c' } : undefined}
                   >
                     <Icon className="w-5 h-5" />
                     <span>{path.name}</span>
@@ -2673,6 +2689,216 @@ const App: React.FC = () => {
                         <li key={tip} className="leading-relaxed">{tip}</li>
                       ))}
                     </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: School Brand Customization */}
+              <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 overflow-hidden">
+                <div className="px-5 py-3 bg-violet-800 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-violet-200" />
+                  <span className="text-sm font-bold text-white">Customize Your School Brand</span>
+                  <span className="ml-auto text-[10px] uppercase tracking-wider text-violet-300 font-semibold">Live preview below</span>
+                </div>
+                <div className="p-5 space-y-5">
+                  {/* School Name */}
+                  <div>
+                    <label htmlFor="brand-school-name" className="block text-sm font-semibold text-slate-800 mb-1">School or District Name</label>
+                    <input
+                      id="brand-school-name"
+                      type="text"
+                      value={previewSchoolName}
+                      onChange={(e) => setPreviewSchoolName(e.target.value)}
+                      placeholder="e.g., Ogden School District"
+                      className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+
+                  {/* Logo Upload */}
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800 mb-1">School Logo</div>
+                    <div className="text-xs text-slate-500 mb-2">
+                      PNG or SVG recommended. Ideal size: <strong>200 x 200px</strong> (square). Max file size: <strong>500 KB</strong>. The logo appears in the header as a circle.
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full border-2 border-dashed border-violet-300 bg-white overflow-hidden flex items-center justify-center flex-shrink-0">
+                        {schoolLogoUrl ? (
+                          <img src={schoolLogoUrl} alt="School logo" className="w-full h-full object-contain p-1" />
+                        ) : (
+                          <div className="text-[9px] text-slate-400 text-center leading-tight px-1">No logo</div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="inline-flex items-center gap-2 rounded-lg bg-violet-700 hover:bg-violet-600 text-white px-3 py-2 text-xs font-semibold cursor-pointer transition-colors">
+                          <Upload className="w-3.5 h-3.5" />
+                          Upload Logo
+                          <input
+                            type="file"
+                            accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 512000) {
+                                alert('Logo file must be under 500 KB.');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setSchoolLogoUrl(ev.target?.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        {schoolLogoUrl && (
+                          <button
+                            onClick={() => setSchoolLogoUrl(null)}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Remove logo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Color Palette */}
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800 mb-1">School Color Palette (up to 5)</div>
+                    <div className="text-xs text-slate-500 mb-3">
+                      Enter hex codes for your school colors. These will update the app preview in real time.
+                    </div>
+                    <div className="space-y-2">
+                      {['Primary (header/nav)', 'Accent (buttons/highlights)', 'Background (light)', 'Text (dark)', 'Secondary accent'].map((label, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={schoolColors[i] || '#ffffff'}
+                            onChange={(e) => {
+                              const next = [...schoolColors];
+                              next[i] = e.target.value;
+                              setSchoolColors(next);
+                            }}
+                            className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={schoolColors[i] || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (/^#?[0-9a-fA-F]{0,6}$/.test(val.replace('#', ''))) {
+                                const next = [...schoolColors];
+                                next[i] = val.startsWith('#') ? val : `#${val}`;
+                                setSchoolColors(next);
+                              }
+                            }}
+                            placeholder="#000000"
+                            className="w-24 rounded border border-slate-300 px-2 py-1 text-xs font-mono text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          />
+                          <span className="text-xs text-slate-500">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live brand preview */}
+                  <div>
+                    <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 text-amber-500" />
+                      Live preview with your brand
+                    </div>
+                    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-lg">
+                      {/* Mini branded header */}
+                      <div className="px-4 py-3 flex items-center gap-3" style={{ backgroundColor: schoolColors[0] || '#1e293b' }}>
+                        <div className="w-8 h-8 rounded-full bg-white/20 overflow-hidden flex items-center justify-center flex-shrink-0">
+                          {schoolLogoUrl ? (
+                            <img src={schoolLogoUrl} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                          ) : (
+                            <GraduationCap className="w-4 h-4 text-white" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-white">{previewSchoolName || 'Your School'}</div>
+                          <div className="text-[10px] leading-tight" style={{ color: `${schoolColors[4] || '#fb923c'}` }}>
+                            Associate Degree Planner
+                          </div>
+                        </div>
+                      </div>
+                      {/* Mini pathway tabs */}
+                      <div className="flex gap-0.5 px-2 py-1.5" style={{ backgroundColor: `${schoolColors[3] || '#334155'}` }}>
+                        {['Tech & Eng', 'Health Sci', 'Business', 'Social'].map((pw, pi) => (
+                          <span
+                            key={pw}
+                            className={`text-[9px] font-medium px-2 py-0.5 rounded-full ${pi === 0 ? 'bg-white font-bold shadow-sm' : 'bg-white/15 text-white/80'}`}
+                            style={pi === 0 ? { color: schoolColors[1] || '#ea580c' } : undefined}
+                          >
+                            {pw}
+                          </span>
+                        ))}
+                      </div>
+                      {/* Mini dashboard */}
+                      <div className="p-3 space-y-2.5" style={{ backgroundColor: schoolColors[2] || '#f8fafc' }}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-grow h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: '65%', backgroundColor: schoolColors[1] || '#ea580c' }} />
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-500">39/60 cr</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {['Sophomore', 'Junior', 'Senior'].map((grade, gi) => (
+                            <div key={grade} className="rounded border border-slate-200 bg-white p-1.5">
+                              <div className="text-[8px] font-bold mb-1 pb-0.5 border-b" style={{ color: schoolColors[3] || '#334155', borderColor: `${schoolColors[1] || '#ea580c'}40` }}>{grade}</div>
+                              {[0, 1, 2].map((ci) => (
+                                <div key={ci} className="flex items-center gap-1 mb-0.5">
+                                  <div
+                                    className="h-1.5 rounded"
+                                    style={{
+                                      width: `${50 + (gi * 10) + (ci * 8)}%`,
+                                      backgroundColor: ci === 0 ? `${schoolColors[1] || '#ea580c'}30` : '#e2e8f0',
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5 flex items-center justify-between">
+                          <span className="text-[9px] font-semibold text-emerald-700">Est. Savings</span>
+                          <span className="text-[10px] font-black text-emerald-800">$4,680</span>
+                        </div>
+                        <div className="text-[9px] text-slate-400 pt-1 border-t border-slate-100 flex items-center justify-between">
+                          <span>Custom branded site</span>
+                          <span className="font-semibold" style={{ color: schoolColors[1] || '#ea580c' }}>{previewSchoolName ? `${previewSchoolName.toLowerCase().replace(/\s+/g, '')}.plannerapp.com` : 'yourschool.plannerapp.com'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deployment options callout */}
+                  <div className="rounded-lg border border-violet-200 bg-white p-4">
+                    <div className="text-sm font-semibold text-violet-900 mb-2">Deployment Options</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="font-semibold text-slate-800 mb-1">Drop into your site</div>
+                        <div className="text-slate-600">Work with your web team to embed the planner directly on your school website.</div>
+                      </div>
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+                        <div className="font-semibold text-violet-800 mb-1">Managed hosting</div>
+                        <div className="text-violet-700">We host and maintain your planner at a custom URL for a monthly fee.</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-center">
+                      <a
+                        href="mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20Setup%20Call"
+                        className="inline-flex items-center gap-2 rounded-lg bg-violet-700 hover:bg-violet-600 text-white px-5 py-2.5 text-sm font-bold transition-colors shadow-sm"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Schedule a 15-Min Setup Call
+                        <ArrowRight className="w-4 h-4" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
