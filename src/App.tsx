@@ -473,6 +473,8 @@ const App: React.FC = () => {
   const [playbookHighlight, setPlaybookHighlight] = useState<string | null>(null);
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
   const [schoolColors, setSchoolColors] = useState<string[]>(['#1e293b', '#ea580c', '#f8fafc', '#334155', '#fb923c']);
+  const [optimizePrefs, setOptimizePrefs] = useState({ ce: true, ap: true, genEd: true, residency: true });
+  const [optimizeFlash, setOptimizeFlash] = useState(false);
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('counselor_setup_step_ids');
@@ -955,6 +957,111 @@ const App: React.FC = () => {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  const handleOptimize = () => {
+    const path = selectedPath;
+    const allPathCourseIds = new Set([
+      ...path.schedule.grade10, ...path.schedule.grade11, ...path.schedule.grade12,
+      ...path.recommendedElectives,
+    ]);
+    const available = ALL_COURSES.filter((c) => allPathCourseIds.has(c.id));
+    const prefs = optimizePrefs;
+
+    // Score each course by preference weight
+    const scoreCourse = (c: HighSchoolCourse): number => {
+      let s = 0;
+      const credits = c.wsuEquivalent.reduce((sum, eq) => sum + eq.credits, 0);
+      if (prefs.ce && c.type === 'CE') s += 20;
+      if (prefs.ap && c.type === 'AP') s += 18;
+      if (prefs.genEd && c.genEdCategory) s += 15;
+      if (prefs.residency && c.type === 'CE') s += 12;
+      s += credits; // heavier courses are more valuable
+      return s;
+    };
+
+    // Sort by score descending
+    const scored = available.map((c) => ({ course: c, score: scoreCourse(c) })).sort((a, b) => b.score - a.score);
+
+    // Assign to grades respecting capacity
+    const g10: string[] = [];
+    const g11: string[] = [];
+    const g12: string[] = [];
+    const pool: string[] = [];
+    const coveredCategories = new Set<string>();
+    let ceCredits = 0;
+
+    // First pass: place pathway-required courses in their default grades
+    const requiredG10 = new Set(path.schedule.grade10);
+    const requiredG11 = new Set(path.schedule.grade11);
+    const requiredG12 = new Set(path.schedule.grade12);
+    const placed = new Set<string>();
+
+    for (const id of path.schedule.grade10) {
+      if (g10.length < MAX_COURSES_PER_YEAR) {
+        g10.push(id); placed.add(id);
+        const c = available.find((x) => x.id === id);
+        if (c?.genEdCategory) coveredCategories.add(c.genEdCategory);
+        if (c?.type === 'CE') ceCredits += c.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+      }
+    }
+    for (const id of path.schedule.grade11) {
+      if (g11.length < MAX_COURSES_PER_YEAR) {
+        g11.push(id); placed.add(id);
+        const c = available.find((x) => x.id === id);
+        if (c?.genEdCategory) coveredCategories.add(c.genEdCategory);
+        if (c?.type === 'CE') ceCredits += c.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+      }
+    }
+    for (const id of path.schedule.grade12) {
+      if (g12.length < MAX_COURSES_PER_YEAR) {
+        g12.push(id); placed.add(id);
+        const c = available.find((x) => x.id === id);
+        if (c?.genEdCategory) coveredCategories.add(c.genEdCategory);
+        if (c?.type === 'CE') ceCredits += c.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+      }
+    }
+
+    // Second pass: fill remaining slots from scored electives
+    for (const { course } of scored) {
+      if (placed.has(course.id)) continue;
+
+      // If genEd pref is on, prioritize uncovered categories
+      let bonus = 0;
+      if (prefs.genEd && course.genEdCategory && !coveredCategories.has(course.genEdCategory)) bonus += 50;
+      if (prefs.residency && course.type === 'CE' && ceCredits < 20) bonus += 30;
+      if (bonus === 0 && !prefs.ce && course.type === 'CE') continue;
+      if (bonus === 0 && !prefs.ap && course.type === 'AP') continue;
+
+      // Try to find space in the best grade (spread evenly, prefer later grades for electives)
+      const grades: [string[], Set<string>][] = [[g10, requiredG10], [g11, requiredG11], [g12, requiredG12]];
+      let assigned = false;
+      // Prefer the grade with the most space
+      const bySpace = [...grades].sort((a, b) => (MAX_COURSES_PER_YEAR - b[0].length) - (MAX_COURSES_PER_YEAR - a[0].length));
+      for (const [grade] of bySpace) {
+        if (grade.length < MAX_COURSES_PER_YEAR) {
+          grade.push(course.id);
+          placed.add(course.id);
+          if (course.genEdCategory) coveredCategories.add(course.genEdCategory);
+          if (course.type === 'CE') ceCredits += course.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+          assigned = true;
+          break;
+        }
+      }
+      if (!assigned) {
+        pool.push(course.id);
+      }
+    }
+
+    // Update assignments
+    setPathAssignments((prev) => ({
+      ...prev,
+      [selectedPathId]: { grade10: g10, grade11: g11, grade12: g12, pool, onDeck: prev[selectedPathId].onDeck },
+    }));
+
+    // Flash animation
+    setOptimizeFlash(true);
+    setTimeout(() => setOptimizeFlash(false), 1500);
   };
 
   const handleDownloadPdf = () => {
@@ -1815,42 +1922,64 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-            <div className="text-xs text-blue-900 font-semibold mb-2">Drag tiles between years, or on mobile tap a tile then use assign buttons:</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-blue-800">
-                {selectedCourse ? `Selected: ${selectedCourse.name}` : 'No tile selected'}
-              </span>
-              <button
-                disabled={!selectedCourseId}
-                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade10')}
-                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
-              >
-                Assign to 10
-              </button>
-              <button
-                disabled={!selectedCourseId}
-                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade11')}
-                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
-              >
-                Assign to 11
-              </button>
-              <button
-                disabled={!selectedCourseId}
-                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'grade12')}
-                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
-              >
-                Assign to 12
-              </button>
-              <button
-                disabled={!selectedCourseId}
-                onClick={() => selectedCourseId && assignCourseToBucket(selectedCourseId, 'pool')}
-                className="text-xs rounded px-3 py-1.5 bg-white border border-blue-200 text-blue-800 disabled:opacity-50"
-              >
-                Move to Pool
-              </button>
+          {/* Optimizer + Manual Controls */}
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            {/* Optimizer Panel */}
+            <div className={`flex-grow rounded-xl border bg-white p-4 transition-all duration-500 ${optimizeFlash ? 'border-green-400 shadow-lg shadow-green-100' : 'border-gray-200 shadow-sm'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {[
+                    { key: 'ce' as const, label: 'CE Credits', desc: 'Concurrent enrollment' },
+                    { key: 'ap' as const, label: 'AP Credits', desc: 'Advanced placement' },
+                    { key: 'genEd' as const, label: 'Gen Ed Coverage', desc: 'Fill requirement gaps' },
+                    { key: 'residency' as const, label: '20 CE for Associate', desc: 'Hit residency target' },
+                  ].map((opt) => (
+                    <label key={opt.key} className="flex items-center gap-1.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={optimizePrefs[opt.key]}
+                        onChange={() => setOptimizePrefs((p) => ({ ...p, [opt.key]: !p[opt.key] }))}
+                        className="accent-orange-600 w-3.5 h-3.5"
+                      />
+                      <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={handleOptimize}
+                  className="ml-auto flex items-center gap-2 rounded-lg bg-orange-600 hover:bg-orange-500 active:scale-[0.97] text-white px-5 py-2.5 text-sm font-bold transition-all shadow-sm flex-shrink-0"
+                  style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
+                >
+                  <Zap className="w-4 h-4" />
+                  Optimize
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Manual assign bar (mobile) */}
+          {selectedCourseId && (
+            <div className="mb-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-blue-800 font-medium">
+                {selectedCourse?.name}:
+              </span>
+              {(['grade10', 'grade11', 'grade12'] as YearBucket[]).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => assignCourseToBucket(selectedCourseId, b)}
+                  className="rounded px-2.5 py-1 bg-white border border-blue-200 text-blue-800 hover:bg-blue-50"
+                >
+                  {b === 'grade10' ? '10' : b === 'grade11' ? '11' : '12'}
+                </button>
+              ))}
+              <button
+                onClick={() => assignCourseToBucket(selectedCourseId, 'pool')}
+                className="rounded px-2.5 py-1 bg-white border border-blue-200 text-blue-800 hover:bg-blue-50"
+              >
+                Pool
+              </button>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
