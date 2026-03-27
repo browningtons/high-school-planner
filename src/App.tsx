@@ -475,6 +475,8 @@ const App: React.FC = () => {
   const [schoolColors, setSchoolColors] = useState<string[]>(['#1e293b', '#ea580c', '#f8fafc', '#334155', '#fb923c']);
   const [optimizePrefs, setOptimizePrefs] = useState({ ce: true, ap: true, genEd: true, residency: true });
   const [optimizeFlash, setOptimizeFlash] = useState(false);
+  const [stage2Open, setStage2Open] = useState(false);
+  const [stage2Picks, setStage2Picks] = useState<Record<string, string>>({});
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('counselor_setup_step_ids');
@@ -506,7 +508,7 @@ const App: React.FC = () => {
   }, [schoolColors]);
 
   useEffect(() => {
-    if (!isImporterOpen) return;
+    if (!isImporterOpen && !stage2Open) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -514,7 +516,7 @@ const App: React.FC = () => {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isImporterOpen]);
+  }, [isImporterOpen, stage2Open]);
 
   useEffect(() => {
     if (!lastAppliedMove) return;
@@ -1060,6 +1062,84 @@ const App: React.FC = () => {
     }));
 
     // Flash animation
+    setOptimizeFlash(true);
+    setTimeout(() => setOptimizeFlash(false), 1500);
+
+    // Check for remaining gaps — open Stage 2 if any
+    const totalSlots = (MAX_COURSES_PER_YEAR * 3) - g10.length - g11.length - g12.length;
+    const missingCats = REQUIRED_CATEGORIES.filter((cat) => !coveredCategories.has(cat));
+    if (totalSlots > 0 && (missingCats.length > 0 || ceCredits < 20)) {
+      setStage2Picks({});
+      setTimeout(() => setStage2Open(true), 600);
+    }
+  };
+
+  // Stage 2: compute gaps and candidate courses
+  const stage2Data = useMemo(() => {
+    if (!stage2Open) return null;
+    const current = selectedAssignments;
+    const placedIds = new Set([...current.grade10, ...current.grade11, ...current.grade12]);
+    const placedCourses = [...placedIds].map((id) => courseById.get(id)).filter(Boolean) as HighSchoolCourse[];
+    const coveredCats = new Set<string>();
+    let ceCredits = 0;
+    let totalCredits = 0;
+    for (const c of placedCourses) {
+      if (c.genEdCategory) coveredCats.add(c.genEdCategory);
+      const cr = c.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+      if (c.type === 'CE') ceCredits += cr;
+      totalCredits += cr;
+    }
+    const missingCats = REQUIRED_CATEGORIES.filter((cat) => !coveredCats.has(cat));
+    const ceGap = Math.max(0, 20 - ceCredits);
+    const creditGap = Math.max(0, 60 - totalCredits);
+    const slotsLeft = (MAX_COURSES_PER_YEAR * 3) - current.grade10.length - current.grade11.length - current.grade12.length;
+
+    // For each missing gen ed category, find candidate courses from ALL_COURSES
+    const genEdOptions: { category: GenEdCategory; courses: HighSchoolCourse[] }[] = missingCats.map((cat) => ({
+      category: cat as GenEdCategory,
+      courses: ALL_COURSES.filter((c) => c.genEdCategory === cat && !placedIds.has(c.id)),
+    }));
+
+    // CE courses not yet placed that could help close residency gap
+    const ceCandidates = ceGap > 0
+      ? ALL_COURSES.filter((c) => c.type === 'CE' && !placedIds.has(c.id) && !c.genEdCategory)
+      : [];
+
+    return { missingCats, genEdOptions, ceGap, ceCredits, creditGap, totalCredits, ceCandidates, slotsLeft };
+  }, [stage2Open, selectedAssignments, courseById]);
+
+  const handleStage2Apply = () => {
+    const picks = Object.values(stage2Picks).filter(Boolean);
+    if (picks.length === 0) { setStage2Open(false); return; }
+
+    setPathAssignments((prev) => {
+      const curr = { ...prev[selectedPathId] };
+      const g10 = [...curr.grade10];
+      const g11 = [...curr.grade11];
+      const g12 = [...curr.grade12];
+      const pool = curr.pool.filter((id) => !picks.includes(id));
+
+      for (const id of picks) {
+        // Remove from pool/onDeck if present
+        const poolIdx = pool.indexOf(id);
+        if (poolIdx >= 0) pool.splice(poolIdx, 1);
+
+        // Place in grade with most space
+        const grades = [g10, g11, g12];
+        grades.sort((a, b) => a.length - b.length);
+        for (const grade of grades) {
+          if (grade.length < MAX_COURSES_PER_YEAR && !grade.includes(id)) {
+            grade.push(id);
+            break;
+          }
+        }
+      }
+
+      return { ...prev, [selectedPathId]: { ...curr, grade10: g10, grade11: g11, grade12: g12, pool, onDeck: curr.onDeck } };
+    });
+
+    setStage2Open(false);
+    setStage2Picks({});
     setOptimizeFlash(true);
     setTimeout(() => setOptimizeFlash(false), 1500);
   };
@@ -2404,6 +2484,140 @@ const App: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Stage 2 Optimizer Modal */}
+      {stage2Open && stage2Data && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button className="absolute inset-0 bg-slate-950/60" onClick={() => setStage2Open(false)} aria-label="Close" />
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Fill Remaining Gaps</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {stage2Data.slotsLeft} slot{stage2Data.slotsLeft !== 1 ? 's' : ''} open &middot; {stage2Data.creditGap > 0 ? `${stage2Data.creditGap} credits to 60` : 'Credits met'} &middot; {stage2Data.ceGap > 0 ? `${stage2Data.ceGap} CE credits to 20` : 'CE met'}
+                </p>
+              </div>
+              <button onClick={() => setStage2Open(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto p-5 space-y-4">
+              {/* Missing Gen Ed categories */}
+              {stage2Data.genEdOptions.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Missing Gen Ed Requirements</div>
+                  <div className="space-y-3">
+                    {stage2Data.genEdOptions.map(({ category, courses }) => (
+                      <div key={category} className="rounded-lg border border-orange-100 bg-orange-50/50 p-3">
+                        <div className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+                          {category}
+                        </div>
+                        {courses.length === 0 ? (
+                          <div className="text-xs text-gray-500 italic">No available courses for this category</div>
+                        ) : (
+                          <div className="space-y-1">
+                            {courses.map((c) => {
+                              const credits = c.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+                              const isSelected = stage2Picks[category] === c.id;
+                              return (
+                                <button
+                                  key={c.id}
+                                  onClick={() => setStage2Picks((p) => ({ ...p, [category]: isSelected ? '' : c.id }))}
+                                  className={`w-full text-left flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all ${
+                                    isSelected
+                                      ? 'bg-orange-600 text-white shadow-sm'
+                                      : 'bg-white border border-gray-200 text-gray-700 hover:border-orange-300 hover:bg-orange-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                      isSelected ? 'bg-white/20 text-white' : c.type === 'CE' ? 'bg-blue-100 text-blue-700' : c.type === 'AP' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                                    }`}>{c.type}</span>
+                                    <span className="font-medium">{c.name}</span>
+                                  </div>
+                                  <span className={`text-xs font-semibold ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>{credits} cr</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* CE gap filler */}
+              {stage2Data.ceGap > 0 && stage2Data.ceCandidates.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                    CE Credits for Residency ({stage2Data.ceCredits}/20 &mdash; need {stage2Data.ceGap} more)
+                  </div>
+                  <div className="space-y-1">
+                    {stage2Data.ceCandidates.slice(0, 8).map((c) => {
+                      const credits = c.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+                      const key = `ce_${c.id}`;
+                      const isSelected = stage2Picks[key] === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => setStage2Picks((p) => ({ ...p, [key]: isSelected ? '' : c.id }))}
+                          className={`w-full text-left flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all ${
+                            isSelected
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-white border border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>CE</span>
+                            <span className="font-medium">{c.name}</span>
+                          </div>
+                          <span className={`text-xs font-semibold ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>{credits} cr</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {stage2Data.genEdOptions.length === 0 && stage2Data.ceGap === 0 && (
+                <div className="text-center py-6 text-gray-500">
+                  <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                  <div className="font-semibold text-gray-800">All requirements covered!</div>
+                  <div className="text-xs mt-1">Your roadmap meets gen ed and CE residency targets.</div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <div className="text-xs text-gray-500">
+                {Object.values(stage2Picks).filter(Boolean).length} course{Object.values(stage2Picks).filter(Boolean).length !== 1 ? 's' : ''} selected
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStage2Open(false)}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={handleStage2Apply}
+                  disabled={Object.values(stage2Picks).filter(Boolean).length === 0}
+                  className="rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 text-sm font-bold transition-colors shadow-sm"
+                  style={{ backgroundColor: Object.values(stage2Picks).filter(Boolean).length > 0 ? (schoolColors[1] || '#ea580c') : undefined }}
+                >
+                  Apply &amp; Fill
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Playbook highlight banner -- floating at top when a section is active */}
       {playbookHighlight && (
