@@ -1369,8 +1369,36 @@ const App: React.FC = () => {
 
     y += 10;
 
+    // ── OPTIONAL / SWAP CANDIDATES ──
+    const optionalIds = [...selectedAssignments.pool, ...selectedAssignments.onDeck];
+    const optionalCourses = optionalIds.map((id) => courseById.get(id)).filter(Boolean) as HighSchoolCourse[];
+    if (optionalCourses.length > 0) {
+      checkPage(50);
+      roundRect(ml, y, pw, 20, 4, [30, 41, 59]); // slate-800
+      text('Optional Classes (Swap Candidates)', ml + 10, y + 14, 9, 'bold', white);
+      y += 26;
+
+      // Render as compact 2-column grid
+      const colW2 = (pw - 10) / 2;
+      optionalCourses.forEach((course, i) => {
+        const col = i % 2;
+        const cx = ml + col * (colW2 + 10);
+        if (col === 0) checkPage(18);
+        const rowBg: [number, number, number] = Math.floor(i / 2) % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+        roundRect(cx, y, colW2, 16, 2, rowBg);
+        text(course.name, cx + 6, y + 11, 7, 'normal', [30, 30, 30]);
+        const cCredits = course.wsuEquivalent.reduce((s, e) => s + e.credits, 0);
+        text(`${cCredits} cr`, cx + colW2 - 28, y + 11, 7, 'normal', gray400);
+        // Type badge
+        const badgeColor: [number, number, number] = course.type === 'CE' ? [37, 99, 235] : course.type === 'AP' ? [147, 51, 234] : course.type === 'IB' ? [107, 114, 128] : [156, 163, 175];
+        text(course.type, cx + colW2 - 50, y + 11, 6, 'bold', badgeColor);
+        if (col === 1 || i === optionalCourses.length - 1) y += 18;
+      });
+      y += 6;
+    }
+
     // ── FOOTER ──
-    const footerY = 760;
+    const footerY = Math.max(y + 20, 760);
     doc.setDrawColor(229, 231, 235);
     doc.line(ml, footerY, ml + pw, footerY);
     text(`${previewSchoolName || 'Your School'} • College Credit Planner`, ml, footerY + 12, 7, 'normal', gray400);
