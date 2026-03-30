@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, List, Globe, Mail, User, Clock, Upload, Download, X, FileText, Copy, Check, DollarSign, ArrowRight, Lock, Unlock, Star } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, Globe, Mail, User, Upload, Download, X, FileText, Copy, Check, DollarSign, ArrowRight, Lock, Unlock, Star } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 // --- DATA STRUCTURES ---
@@ -417,30 +417,6 @@ const parseCsvLine = (line: string): string[] => {
 
 // --- COMPONENTS ---
 
-// Tooltip Component for Header Info
-const Tooltip: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  return (
-    <div className="relative inline-block">
-      <button 
-        className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-orange-100 px-3 py-2 rounded-lg transition-colors text-sm font-medium border border-white/10"
-        onMouseEnter={() => setIsOpen(true)}
-        onMouseLeave={() => setIsOpen(false)}
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        {icon}
-        <span>{title}</span>
-      </button>
-      
-      {isOpen && (
-        <div className="absolute z-50 top-full mt-2 left-0 w-72 p-4 bg-white text-gray-800 rounded-xl shadow-2xl border border-gray-100 text-sm animate-in fade-in zoom-in-95 duration-200">
-           {children}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const BOOKING_URL = 'mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%2015-Min%20Call';
 
@@ -606,23 +582,6 @@ const App: React.FC = () => {
   const unpassedExamIdSet = useMemo(() => new Set(unpassedExamCourseIds), [unpassedExamCourseIds]);
 
   const isExamBasedCourse = (course: HighSchoolCourse) => course.type === 'AP' || course.type === 'IB';
-
-  const gradStats = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let targetYear = today.getFullYear();
-    let targetDate = new Date(targetYear, 8, 1); // Sept 1
-
-    if (today > targetDate) {
-      targetYear += 1;
-      targetDate = new Date(targetYear, 8, 1);
-    }
-
-    const diff = targetDate.getTime() - today.getTime();
-    const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-
-    return { date: targetDate, days: Math.max(0, daysLeft), year: targetYear };
-  }, []);
 
   // Computed data for the selected path
   const {
@@ -1671,85 +1630,45 @@ const App: React.FC = () => {
       <div className="text-white shadow-xl" style={{ backgroundColor: schoolColors[0] || '#1e293b' }}>
         <div className="max-w-6xl mx-auto p-6 md:p-8">
           
-          <div className="flex flex-col md:flex-row gap-6">
-             {/* Logo — uses uploaded school logo or default tiger */}
-            <div className="hidden md:block w-24 h-24 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
-               <img
-                  src={schoolLogoUrl || 'tiger-logo.png'}
-                  alt={`${previewSchoolName || 'School'} logo`}
-                  className="w-full h-full object-contain p-1"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
-                  }}
-               />
-               <div className="absolute inset-0 flex items-center justify-center text-white font-bold text-xs" style={{zIndex: -1}}>
-                  LOGO
-               </div>
-            </div>
-
-            <div className="flex-grow flex flex-col justify-center text-center md:text-left">
-                <div className="flex items-center justify-center md:justify-start space-x-3 mb-2">
-                  <GraduationCap className="w-8 h-8" style={{ color: schoolColors[4] || '#fb923c' }} />
-                  <span className="font-semibold tracking-wider text-sm uppercase" style={{ color: `${schoolColors[4] || '#fb923c'}cc` }}>{previewSchoolName || 'Your School'} &bull; College Credit Planner</span>
-                </div>
-                <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight text-white mb-3">
-                  Earn Your Associate's Degree in High School
-                </h1>
-                <p className="text-slate-300 max-w-2xl text-lg mb-4 mx-auto md:mx-0">
-                  Get a head start on college by fulfilling your General Education requirements while still in high school.
-                </p>
-                
-                {/* Info Tooltips - Moved Here */}
-                <div className="flex gap-3 justify-center md:justify-start">
-                   <Tooltip icon={<Award className="w-4 h-4" />} title="Degree Options">
-                      <h4 className="font-bold text-orange-600 mb-2">Associate's Options</h4>
-                      <div className="text-xs space-y-2 text-gray-600">
-                        <p><strong>Associate of Science (AS):</strong><br/>Fulfill all Core Gen Requirements.</p>
-                        <p><strong>Associate of Arts (AA):</strong><br/>Fulfill Core Reqs + Foreign Lang (1020 level).</p>
-                      </div>
-                   </Tooltip>
-
-	                   <Tooltip icon={<List className="w-4 h-4" />} title="Core Requirements">
-	                      <h4 className="font-bold text-orange-600 mb-2">To Earn the Degree:</h4>
-	                      <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
-	                        <li><strong>60 Total</strong> Credit Hours</li>
-	                        <li>1 course from EACH Gen Ed category</li>
-	                        <li><strong>20 Credits</strong> from your local university (CE)</li>
-	                        <li>AP/IB credits count only after passing exams</li>
-	                        <li>1 Cultural Competence course (*)</li>
-	                      </ul>
-	                   </Tooltip>
-
-                     <button
-                       onClick={() => setIsImporterOpen(true)}
-                       className="flex items-center space-x-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-100 px-3 py-2 rounded-lg transition-colors text-sm font-medium border border-blue-300/30"
-                       title="Open School Importer Prototype"
-                     >
-                       <Upload className="w-4 h-4" />
-                       <span>Importer</span>
-                     </button>
-                </div>
-            </div>
-
-	            {/* Graduation Countdown Widget in Header */}
-	            <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 flex-shrink-0 self-start h-fit">
-                {/* Countdown Section */}
-                <div>
-                  <h3 className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-2 flex items-center justify-center md:justify-start">
-                    <Clock className="w-3 h-3 mr-1.5" /> Time Until 10th Grade
-                  </h3>
-                  
-                  <div className="text-center">
-                      <div className="text-3xl font-black text-white mb-0 leading-none">{gradStats.days}</div>
-                      <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Days Left</div>
-                      <div className="pt-2 border-t border-white/10 text-[10px] text-slate-400 flex justify-start items-center">
-                        <span>Starts: <strong>Sep {gradStats.year}</strong></span>
-                      </div>
-                  </div>
-                </div>
-	            </div>
+          <div className="flex flex-col md:flex-row md:items-center gap-5">
+          {/* Logo */}
+          <div className="hidden md:block w-20 h-20 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
+            <img
+              src={schoolLogoUrl || 'tiger-logo.png'}
+              alt={`${previewSchoolName || 'School'} logo`}
+              className="w-full h-full object-contain p-1"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
           </div>
+
+          {/* Value prop */}
+          <div className="flex-grow">
+            <div className="flex items-center gap-2 mb-1.5">
+              <GraduationCap className="w-5 h-5 flex-shrink-0" style={{ color: schoolColors[4] || '#fb923c' }} />
+              <span className="font-semibold tracking-wider text-xs uppercase opacity-80" style={{ color: schoolColors[4] || '#fb923c' }}>
+                {previewSchoolName || 'Your School'} &bull; College Credit Planner
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight leading-tight text-white">
+              Earn Your Associate's Degree in High School
+            </h1>
+            <p className="text-slate-300 text-sm md:text-base mt-1.5 max-w-xl">
+              Save up to $5,400 in tuition by earning college credit before graduation.
+            </p>
+          </div>
+
+          {/* Single CTA */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => setIsImporterOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl text-white px-6 py-3 text-sm font-extrabold shadow-lg transition-all hover:brightness-110 active:scale-[0.97]"
+              style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
+            >
+              <Upload className="w-4 h-4" />
+              Customize for Your School
+            </button>
+          </div>
+        </div>
           
           {/* Action Bar: Path Selectors ONLY - Single Row */}
           <div id="section-pathway-tabs" className={`mt-8 pt-6 border-t border-white/10 scroll-mt-4 rounded-xl transition-shadow ${playbookHighlight === 'section-pathway-tabs' ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-900' : ''}`}>
