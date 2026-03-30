@@ -460,7 +460,15 @@ const App: React.FC = () => {
   const [isImporterOpen, setIsImporterOpen] = useState(false);
   const [previewSchoolName, setPreviewSchoolName] = useState('Your School');
   const [pathAssignments, setPathAssignments] = useState<Record<SkillPath['id'], PathAssignments>>(
-    () => buildInitialAssignmentMap()
+    () => {
+      try {
+        const stored = localStorage.getItem('path_assignments');
+        if (stored) return JSON.parse(stored) as Record<SkillPath['id'], PathAssignments>;
+      } catch {
+        // ignore
+      }
+      return buildInitialAssignmentMap();
+    }
   );
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [draggedCourseId, setDraggedCourseId] = useState<string | null>(null);
@@ -494,6 +502,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('counselor_setup_step_ids', JSON.stringify(completedSetupStepIds));
   }, [completedSetupStepIds]);
+
+  useEffect(() => {
+    localStorage.setItem('path_assignments', JSON.stringify(pathAssignments));
+  }, [pathAssignments]);
 
   // Apply school brand colors as CSS custom properties
   useEffect(() => {
