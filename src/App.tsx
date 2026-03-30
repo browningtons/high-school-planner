@@ -475,6 +475,7 @@ const App: React.FC = () => {
   const [schoolColors, setSchoolColors] = useState<string[]>(['#1e293b', '#ea580c', '#f8fafc', '#334155', '#fb923c']);
   const [optimizePrefs, setOptimizePrefs] = useState({ ce: true, ap: true, genEd: true, residency: true });
   const [optimizeFlash, setOptimizeFlash] = useState(false);
+  const [optimizeAnimColumns, setOptimizeAnimColumns] = useState<Set<number>>(new Set());
   const [stage2Open, setStage2Open] = useState(false);
   const [stage2Picks, setStage2Picks] = useState<Record<string, string>>({});
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
@@ -1061,9 +1062,13 @@ const App: React.FC = () => {
       [selectedPathId]: { grade10: g10, grade11: g11, grade12: g12, pool, onDeck: prev[selectedPathId].onDeck },
     }));
 
-    // Flash animation
+    // Flash animation + staggered column animation
     setOptimizeFlash(true);
     setTimeout(() => setOptimizeFlash(false), 1500);
+    setOptimizeAnimColumns(new Set([0]));
+    setTimeout(() => setOptimizeAnimColumns(new Set([0, 1])), 200);
+    setTimeout(() => setOptimizeAnimColumns(new Set([0, 1, 2])), 400);
+    setTimeout(() => setOptimizeAnimColumns(new Set()), 1200);
 
     // Check for remaining gaps — open Stage 2 if any
     const totalSlots = (MAX_COURSES_PER_YEAR * 3) - g10.length - g11.length - g12.length;
@@ -1142,6 +1147,10 @@ const App: React.FC = () => {
     setStage2Picks({});
     setOptimizeFlash(true);
     setTimeout(() => setOptimizeFlash(false), 1500);
+    setOptimizeAnimColumns(new Set([0]));
+    setTimeout(() => setOptimizeAnimColumns(new Set([0, 1])), 200);
+    setTimeout(() => setOptimizeAnimColumns(new Set([0, 1, 2])), 400);
+    setTimeout(() => setOptimizeAnimColumns(new Set()), 1200);
   };
 
   const handleDownloadPdf = () => {
@@ -2036,38 +2045,49 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Optimizer + Manual Controls */}
-          <div className="mb-4 flex flex-col sm:flex-row gap-3">
-            {/* Optimizer Panel */}
-            <div className={`flex-grow rounded-xl border bg-white p-4 transition-all duration-500 ${optimizeFlash ? 'border-green-400 shadow-lg shadow-green-100' : 'border-gray-200 shadow-sm'}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  {[
-                    { key: 'ce' as const, label: 'CE Credits', desc: 'Concurrent enrollment' },
-                    { key: 'ap' as const, label: 'AP Credits', desc: 'Advanced placement' },
-                    { key: 'genEd' as const, label: 'Gen Ed Coverage', desc: 'Fill requirement gaps' },
-                    { key: 'residency' as const, label: '20 CE for Associate', desc: 'Hit residency target' },
-                  ].map((opt) => (
-                    <label key={opt.key} className="flex items-center gap-1.5 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={optimizePrefs[opt.key]}
-                        onChange={() => setOptimizePrefs((p) => ({ ...p, [opt.key]: !p[opt.key] }))}
-                        className="accent-orange-600 w-3.5 h-3.5"
-                      />
-                      <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900">{opt.label}</span>
-                    </label>
-                  ))}
+          {/* Optimizer Hero Card */}
+          <div className={`mb-6 rounded-2xl border-2 transition-all duration-500 overflow-hidden ${optimizeFlash ? 'border-green-400 shadow-xl shadow-green-100/60' : 'border-gray-200 shadow-md'}`}>
+            <div
+              className="px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-5"
+              style={{ background: `linear-gradient(135deg, ${schoolColors[0] || '#1e293b'} 0%, ${schoolColors[3] || '#334155'} 100%)` }}
+            >
+              {/* Left: title + subtitle */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-5 h-5 text-yellow-300 flex-shrink-0" />
+                  <h3 className="text-lg font-extrabold text-white tracking-tight">Build My Roadmap</h3>
                 </div>
-                <button
-                  onClick={handleOptimize}
-                  className="ml-auto flex items-center gap-2 rounded-lg bg-orange-600 hover:bg-orange-500 active:scale-[0.97] text-white px-5 py-2.5 text-sm font-bold transition-all shadow-sm flex-shrink-0"
-                  style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
-                >
-                  <Zap className="w-4 h-4" />
-                  Optimize
-                </button>
+                <p className="text-sm text-white/70 leading-snug">Automatically place the highest-value courses across all three grade years based on your priorities.</p>
               </div>
+              {/* Right: big button */}
+              <button
+                onClick={handleOptimize}
+                className="flex items-center justify-center gap-2.5 rounded-xl text-white px-7 py-3.5 text-base font-extrabold transition-all duration-150 shadow-lg active:scale-[0.96] hover:brightness-110 flex-shrink-0"
+                style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
+              >
+                <Zap className="w-5 h-5" />
+                Auto-Fill Roadmap
+              </button>
+            </div>
+            {/* Preferences row */}
+            <div className="bg-white px-6 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-gray-100">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest mr-1">Prioritize:</span>
+              {[
+                { key: 'ce' as const, label: 'CE Credits' },
+                { key: 'ap' as const, label: 'AP Credits' },
+                { key: 'genEd' as const, label: 'Gen Ed Coverage' },
+                { key: 'residency' as const, label: '20 CE Residency' },
+              ].map((opt) => (
+                <label key={opt.key} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={optimizePrefs[opt.key]}
+                    onChange={() => setOptimizePrefs((p) => ({ ...p, [opt.key]: !p[opt.key] }))}
+                    className="w-4 h-4 rounded accent-orange-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{opt.label}</span>
+                </label>
+              ))}
             </div>
           </div>
 
@@ -2103,6 +2123,7 @@ const App: React.FC = () => {
                 badge: '10',
                 borderClass: 'border-orange-400',
                 credits: yearlyCreditTotals.grade10,
+                colIndex: 0,
               },
               {
                 key: 'grade11' as YearBucket,
@@ -2110,6 +2131,7 @@ const App: React.FC = () => {
                 badge: '11',
                 borderClass: 'border-orange-500',
                 credits: yearlyCreditTotals.grade11,
+                colIndex: 1,
               },
               {
                 key: 'grade12' as YearBucket,
@@ -2117,9 +2139,12 @@ const App: React.FC = () => {
                 badge: '12',
                 borderClass: 'border-orange-600',
                 credits: yearlyCreditTotals.grade12,
+                colIndex: 2,
               },
-            ].map((year) => (
-              <div key={year.key} className={`bg-white rounded-xl p-4 border-t-4 ${year.borderClass} shadow-sm flex flex-col h-full relative`}>
+            ].map((year) => {
+              const isAnimating = optimizeAnimColumns.has(year.colIndex);
+              return (
+              <div key={year.key} className={`bg-white rounded-xl p-4 border-t-4 ${year.borderClass} shadow-sm flex flex-col h-full relative transition-all duration-300 ${isAnimating ? 'ring-2 ring-green-400 ring-offset-2 shadow-lg shadow-green-100/60 scale-[1.02]' : ''}`}>
                 <div className="flex items-center mb-4 pb-2 border-b border-gray-100">
                   <div className="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-2">{year.badge}</div>
                   <h3 className="font-bold text-gray-800">{year.label}</h3>
@@ -2161,7 +2186,8 @@ const App: React.FC = () => {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
