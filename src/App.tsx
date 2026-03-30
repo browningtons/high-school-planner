@@ -1765,6 +1765,26 @@ const App: React.FC = () => {
           })()}
         </div>
 
+        {/* Completion banner — shown when all 3 requirements are met */}
+        {totalCredits >= 60 && wsuResidencyCredits >= 20 && assignedProgress.missingCategories.length === 0 && (
+          <div className="rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 p-5 flex flex-col sm:flex-row items-center gap-4 shadow-lg animate-[fadeSlideIn_0.3s_ease-out]">
+            <div className="text-4xl select-none">🎓</div>
+            <div className="flex-grow text-center sm:text-left">
+              <div className="text-lg font-extrabold text-white leading-tight">Associate's Degree Requirements Met!</div>
+              <div className="text-green-100 text-sm mt-0.5">
+                {totalCredits} credits &bull; {wsuResidencyCredits} CE credits &bull; all 9 Gen Ed categories covered
+              </div>
+            </div>
+            <button
+              onClick={handleDownloadPdf}
+              className="flex-shrink-0 flex items-center gap-2 bg-white text-green-700 font-bold text-sm px-5 py-2.5 rounded-xl shadow hover:bg-green-50 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download Roadmap
+            </button>
+          </div>
+        )}
+
         {/* SECTION: COUNSELOR TOOLS -- compact 3-column row */}
         <div id="counselor-tools" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
