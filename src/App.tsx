@@ -442,6 +442,8 @@ const Tooltip: React.FC<{ icon: React.ReactNode; title: string; children: React.
   );
 };
 
+const BOOKING_URL = 'mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%2015-Min%20Call';
+
 const App: React.FC = () => {
   const [selectedPathId, setSelectedPathId] = useState<SkillPath['id']>('tech');
   const [showFullCatalog, setShowFullCatalog] = useState(false);
@@ -493,6 +495,9 @@ const App: React.FC = () => {
     } catch {
       return [];
     }
+  });
+  const [ctaDismissed, setCtaDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('cta_bar_dismissed') === '1'; } catch { return false; }
   });
   
   useEffect(() => {
@@ -1661,7 +1666,7 @@ const App: React.FC = () => {
   const dataDictionaryCsvUrl = `${import.meta.env.BASE_URL}data_dictionary.csv`;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans pb-12">
+    <div className="min-h-screen bg-gray-50 font-sans pb-24">
       {/* Top Banner (Solid Background) — uses school primary color */}
       <div className="text-white shadow-xl" style={{ backgroundColor: schoolColors[0] || '#1e293b' }}>
         <div className="max-w-6xl mx-auto p-6 md:p-8">
@@ -2557,6 +2562,30 @@ const App: React.FC = () => {
 
       </div>
 
+      {/* Persistent CTA bar */}
+      {!ctaDismissed && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center gap-4 px-4 py-3 sm:px-6 bg-gradient-to-r from-slate-900 to-indigo-950 border-t border-indigo-800 shadow-2xl">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-white leading-tight">Want this at your school?</div>
+            <div className="text-xs text-slate-300 mt-0.5 hidden sm:block">Get a branded planner live for your students in 48 hours.</div>
+          </div>
+          <a
+            href={BOOKING_URL}
+            className="flex-shrink-0 inline-flex items-center gap-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white px-5 py-2.5 text-sm font-extrabold transition-colors shadow-lg whitespace-nowrap"
+          >
+            Schedule a 15-Min Call
+            <ArrowRight className="w-4 h-4" />
+          </a>
+          <button
+            onClick={() => { setCtaDismissed(true); localStorage.setItem('cta_bar_dismissed', '1'); }}
+            className="flex-shrink-0 p-1.5 rounded text-slate-400 hover:text-white transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Stage 2 Optimizer Modal */}
       {stage2Open && stage2Data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -3236,7 +3265,7 @@ const App: React.FC = () => {
                         </div>
                         <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600">
                           <a
-                            href="mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%20Call"
+                            href={BOOKING_URL}
                             className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-white text-blue-700 px-4 py-2.5 text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm"
                           >
                             Schedule a 15-Min Call
