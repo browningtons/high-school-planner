@@ -632,7 +632,6 @@ const App: React.FC = () => {
     };
   }, [plannedCourses, unpassedExamIdSet]);
 
-  const uniqueCourseCount = plannedCourses.length;
   const completedSetupCount = completedSetupStepIds.length;
   const isAllCoursesAssigned = selectedAssignments.pool.length === 0;
 
@@ -1698,62 +1697,67 @@ const App: React.FC = () => {
 
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
 
-        {/* SECTION 1: DEGREE REQUIREMENTS (TOP DASHBOARD) */}
-	        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <BookOpen className="w-5 h-5 mr-2 text-orange-600" />
-              Degree Progress Dashboard
-            </h2>
+        {/* SECTION 1: DEGREE PROGRESS — 3 KEY STATS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Stat 1: Total Credits */}
+          {(() => {
+            const pct = Math.min(100, (totalCredits / 60) * 100);
+            const done = totalCredits >= 60;
+            return (
+              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-colors ${done ? 'border-green-400' : 'border-orange-300'}`}>
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Credits Earned</div>
+                <div className={`text-4xl font-black leading-none ${done ? 'text-green-600' : 'text-orange-600'}`}>
+                  {totalCredits}<span className="text-xl font-semibold text-gray-400">/60</span>
+                </div>
+                <div className="mt-3 w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${done ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="mt-1.5 text-xs text-gray-400">60 credit hours required for associate degree</div>
+                {done && <div className="mt-2 text-xs font-semibold text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Requirement met</div>}
+              </div>
+            );
+          })()}
 
-	            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-	               {/* Total Credits */}
-	               <div>
-	                  <div className="flex justify-between text-sm font-semibold mb-1">
-	                    <span className="text-gray-700">Total Earned Credits (unique classes)</span>
-	                    <span className={totalCredits >= 60 ? 'text-green-600' : 'text-gray-500'}>
-	                      {totalCredits} / 60
-	                    </span>
-	                  </div>
-	                  <div className="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
-                    <div 
-                      className={`h-4 rounded-full transition-all duration-500 ${totalCredits >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} 
-	                      style={{ width: `${Math.min(100, (totalCredits / 60) * 100)}%` }}
-	                    ></div>
-	                    <div className="absolute top-0 bottom-0 border-l-2 border-white opacity-50 border-dashed" style={{ left: '33%' }} title="20 Credit Residency Line"></div>
-	                  </div>
-	                  <p className="text-xs text-gray-500 mt-1">
-	                    AP/IB credits only count when the exam is marked as passed.
-	                  </p>
-	               </div>
+          {/* Stat 2: CE Residency */}
+          {(() => {
+            const pct = Math.min(100, (wsuResidencyCredits / 20) * 100);
+            const done = wsuResidencyCredits >= 20;
+            return (
+              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-colors ${done ? 'border-green-400' : 'border-blue-300'}`}>
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">CE Credits</div>
+                <div className={`text-4xl font-black leading-none ${done ? 'text-green-600' : 'text-blue-600'}`}>
+                  {wsuResidencyCredits}<span className="text-xl font-semibold text-gray-400">/20</span>
+                </div>
+                <div className="mt-3 w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${done ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="mt-1.5 text-xs text-gray-400">20 CE credits required for residency</div>
+                {done && <div className="mt-2 text-xs font-semibold text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Requirement met</div>}
+              </div>
+            );
+          })()}
 
-               {/* Residency Check */}
-               <div className={`p-3 rounded-lg border flex items-center ${wsuResidencyCredits >= 20 ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
-                  {wsuResidencyCredits >= 20 ? <CheckCircle className="w-8 h-8 text-green-600 mr-3" /> : <AlertTriangle className="w-8 h-8 text-orange-600 mr-3" />}
-                  <div>
-                    <h4 className={`font-bold text-sm ${wsuResidencyCredits >= 20 ? 'text-green-800' : 'text-orange-800'}`}>
-                      Residency Requirement: {wsuResidencyCredits} / 20
-                    </h4>
-                    <p className={`text-xs leading-tight ${wsuResidencyCredits >= 20 ? 'text-green-700' : 'text-orange-700'}`}>
-                       {wsuResidencyCredits >= 20 ? 'Requirement Met' : 'Need 20 credits from Concurrent Enrollment (CE) courses.'}
-                    </p>
-	                  </div>
-	               </div>
-	            </div>
-	            <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-	              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-	                <span className="text-gray-500">Unique classes counted</span>
-	                <div className="font-bold text-gray-900">{uniqueCourseCount}</div>
-	              </div>
-	              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-	                <span className="text-gray-500">AP/IB credits earned</span>
-	                <div className="font-bold text-gray-900">{apIbEarnedCredits}</div>
-	              </div>
-	              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-	                <span className="text-gray-500">AP/IB credit potential</span>
-	                <div className="font-bold text-gray-900">{apIbPotentialCredits}</div>
-	              </div>
-	            </div>
-	        </div>
+          {/* Stat 3: Gen Ed Coverage */}
+          {(() => {
+            const covered = assignedProgress.satisfiedCategories.size;
+            const total = REQUIRED_CATEGORIES.length;
+            const pct = Math.min(100, (covered / total) * 100);
+            const done = covered >= total;
+            return (
+              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-colors ${done ? 'border-green-400' : 'border-violet-300'}`}>
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Gen Ed Coverage</div>
+                <div className={`text-4xl font-black leading-none ${done ? 'text-green-600' : 'text-violet-600'}`}>
+                  {covered}<span className="text-xl font-semibold text-gray-400">/{total}</span>
+                </div>
+                <div className="mt-3 w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${done ? 'bg-green-500' : 'bg-violet-500'}`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="mt-1.5 text-xs text-gray-400">1 course from each of 9 Gen Ed categories</div>
+                {done && <div className="mt-2 text-xs font-semibold text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> All categories covered</div>}
+              </div>
+            );
+          })()}
+        </div>
 
         {/* SECTION: COUNSELOR TOOLS -- compact 3-column row */}
         <div id="counselor-tools" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
