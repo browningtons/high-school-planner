@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, Globe, Mail, User, Upload, Download, X, FileText, Copy, Check, DollarSign, ArrowRight, Lock, Unlock, Star } from 'lucide-react';
+import { Zap, Heart, Briefcase, CheckCircle, Circle, BookOpen, GraduationCap, AlertTriangle, School, Award, ChevronDown, ChevronUp, Search, Globe, Mail, User, Upload, Download, X, Copy, Check, DollarSign, ArrowRight, Lock, Unlock, Star } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 // --- DATA STRUCTURES ---
@@ -462,6 +462,7 @@ const App: React.FC = () => {
   const [optimizePrefs, setOptimizePrefs] = useState({ ce: true, ap: true, genEd: true, residency: true });
   const [optimizeFlash, setOptimizeFlash] = useState(false);
   const [optimizeAnimColumns, setOptimizeAnimColumns] = useState<Set<number>>(new Set());
+  const [showPdfToast, setShowPdfToast] = useState(false);
   const [stage2ShowInline, setStage2ShowInline] = useState(false);
   const [stage2Picks, setStage2Picks] = useState<Record<string, string>>({});
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
@@ -1044,6 +1045,12 @@ const App: React.FC = () => {
     setTimeout(() => setOptimizeAnimColumns(new Set([0, 1])), 200);
     setTimeout(() => setOptimizeAnimColumns(new Set([0, 1, 2])), 400);
     setTimeout(() => setOptimizeAnimColumns(new Set()), 1200);
+
+    // Show PDF toast after animation
+    setTimeout(() => {
+      setShowPdfToast(true);
+      setTimeout(() => setShowPdfToast(false), 6000);
+    }, 1400);
 
     // Check for remaining gaps — show inline panel if any
     const totalSlots = (MAX_COURSES_PER_YEAR * 3) - g10.length - g11.length - g12.length;
@@ -1965,21 +1972,29 @@ const App: React.FC = () => {
 
 	        {/* SECTION 2: YEARLY ROADMAP */}
         <div id="section-roadmap" className={`scroll-mt-4 rounded-xl transition-shadow ${playbookHighlight === 'section-roadmap' ? 'ring-2 ring-blue-400 ring-offset-4' : ''}`}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <h2 className="text-2xl font-bold text-gray-900">{selectedPath.name} Roadmap</h2>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* PDF toast — shows after optimize */}
+              {showPdfToast && (
+                <div className="flex items-center gap-2 bg-green-600 text-white text-sm font-semibold px-3 py-2 rounded-xl shadow-lg animate-[fadeSlideIn_0.25s_ease-out]">
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                  Roadmap built!
+                </div>
+              )}
               <button
                 onClick={handleDownloadPdf}
-                className="text-xs sm:text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 font-semibold text-gray-700 flex items-center gap-1.5"
+                className="flex items-center gap-2 rounded-xl text-white px-4 py-2 text-sm font-bold shadow-md transition-all hover:brightness-110 active:scale-[0.97]"
+                style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
               >
-                <FileText className="w-3.5 h-3.5" />
-                Download PDF
+                <Download className="w-4 h-4" />
+                Download Family Roadmap
               </button>
               <button
                 onClick={handleResetPathAssignments}
-                className="text-xs sm:text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 font-semibold text-gray-700"
+                className="text-xs sm:text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 px-3 py-2 font-semibold text-gray-600"
               >
-                Reset to Path Default
+                Reset
               </button>
             </div>
           </div>
