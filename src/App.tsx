@@ -798,51 +798,6 @@ const App: React.FC = () => {
     [selectedAssignments.pool, focusedPoolCourseIds]
   );
 
-  const guidanceFocus = useMemo(() => {
-    if (requiredCoursesInPool.length > 0) {
-      return {
-        eyebrow: 'Step 1',
-        title: 'Place required pathway courses first',
-        detail: `${requiredCoursesInPool.length} required pathway course${requiredCoursesInPool.length === 1 ? '' : 's'} still need a year assignment.`,
-        toneClass: 'border-orange-200 bg-orange-50 text-orange-900',
-      };
-    }
-
-    if (primaryMissingCategory) {
-      return {
-        eyebrow: 'Step 2',
-        title: `Close the next college requirement gap: ${primaryMissingCategory}`,
-        detail: 'Choose a course that satisfies this missing category, then place it in the suggested grade.',
-        toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-      };
-    }
-
-    if (assignedProgress.residencyCredits < 20) {
-      return {
-        eyebrow: 'Step 3',
-        title: 'Add another Concurrent Enrollment course',
-        detail: `The plan still needs ${20 - assignedProgress.residencyCredits} more residency credits from CE classes.`,
-        toneClass: 'border-blue-200 bg-blue-50 text-blue-900',
-      };
-    }
-
-    if (selectedAssignments.pool.length > 0) {
-      return {
-        eyebrow: 'Final planning pass',
-        title: 'Place the remaining optional courses',
-        detail: 'You are on track. Finish by placing the strongest remaining electives.',
-        toneClass: 'border-slate-200 bg-slate-50 text-slate-900',
-      };
-    }
-
-    return {
-      eyebrow: 'Ready for meeting',
-      title: 'The year plan is fully placed',
-      detail: 'All roadmap and optional courses are assigned. Move to parent prep and counselor talking points.',
-      toneClass: 'border-green-200 bg-green-50 text-green-900',
-    };
-  }, [requiredCoursesInPool.length, primaryMissingCategory, assignedProgress.residencyCredits, selectedAssignments.pool.length]);
-
   const handleToggleExamPassed = (courseId: string) => {
     setUnpassedExamCourseIds((current) =>
       current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
@@ -2275,256 +2230,188 @@ const App: React.FC = () => {
           )}
         </div>
 
-	        {/* SECTION 3: GUIDED COUNSELOR WORKSPACE */}
-	        <div className="space-y-6">
-	          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-	            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-	              <div>
-	                <h3 className="text-xl font-bold text-gray-900">Guided Counselor Workspace</h3>
-	                <p className="text-sm text-gray-600 mt-1">
-	                  Follow one clear move at a time: identify the gap, place the best course, then confirm the checklist updates.
-	                </p>
-	              </div>
-	              <div className={`rounded-lg border px-4 py-3 max-w-md ${guidanceFocus.toneClass}`}>
-	                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">{guidanceFocus.eyebrow}</div>
-	                <div className="text-base font-bold mt-1">{guidanceFocus.title}</div>
-	                <div className="text-sm mt-1 opacity-90">{guidanceFocus.detail}</div>
-	              </div>
-	            </div>
-	          </div>
-
-	          <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.95fr] gap-6 items-start">
-	            <div className="space-y-6">
-	              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-	                <div className="px-5 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-	                  <div className="flex items-center justify-between gap-3">
-	                    <div>
-	                      <h3 className="text-lg font-bold text-gray-900">Do This Next</h3>
-	                      <p className="text-sm text-gray-600 mt-1">
-	                        Keep the counselor focused on the next highest-value move.
-	                      </p>
-	                    </div>
-	                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold">
-	                      {selectedAssignments.pool.length} courses not placed
-	                    </span>
-	                  </div>
-	                </div>
-
-	                <div className="p-5 space-y-5">
-	                  {studentNextStep && studentNextStepCourse ? (
-	                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-	                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Recommended move</div>
-	                      <div className="mt-2 text-lg font-bold text-blue-950">{studentNextStepCourse.name}</div>
-	                      <div className="mt-1 text-sm text-blue-900">{studentNextStep.reason}</div>
-	                      <div className="mt-2 text-sm text-blue-800">
-	                        Place this in <span className="font-semibold">{YEAR_LABELS[studentNextStep.targetYear]}</span>.
-	                      </div>
-	                      <button
-	                        onClick={handleApplyRecommendation}
-	                        className="mt-4 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 font-semibold"
-	                      >
-	                        Add Recommended Course to {YEAR_LABELS[studentNextStep.targetYear]}
-	                      </button>
-	                    </div>
-	                  ) : (
-	                    <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-green-900">
-	                      <div className="font-semibold">Planning queue is clear</div>
-	                      <div className="text-sm mt-1">All unplaced courses have been addressed. Move on to parent prep or final talking points.</div>
-	                    </div>
-	                  )}
-
-	                  {lastAppliedMove && (
-	                    <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 flex items-center gap-3 animate-[fadeSlideIn_0.3s_ease-out]">
-	                      <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
-	                      <div className="text-sm text-green-900">
-	                        <span className="font-semibold">{lastAppliedMove.courseName}</span> placed in <span className="font-semibold">{lastAppliedMove.yearLabel}</span>. Scroll up to see it in the roadmap.
-	                      </div>
-	                    </div>
-	                  )}
-
-	                  <div>
-	                    <div className="flex items-center justify-between gap-3 mb-3">
-	                      <div>
-	                        <h4 className="text-base font-bold text-gray-900">Best choices right now</h4>
-	                        <p className="text-sm text-gray-600">
-	                          These courses directly support the current planning step.
-	                        </p>
-	                      </div>
-	                      {primaryMissingCategory && (
-	                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full font-semibold">
-	                          Working on: {primaryMissingCategory}
-	                        </span>
-	                      )}
-	                    </div>
-
-	                    <div
-	                      className={`grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border-2 border-dashed p-3 transition-colors ${
-	                        activeDropZone === 'pool' ? 'border-blue-300 bg-blue-50/40' : 'border-gray-100 bg-gray-50/60'
-	                      }`}
-	                      onDragOver={(event) => {
-	                        event.preventDefault();
-	                        setActiveDropZone('pool');
-	                      }}
-	                      onDragLeave={() => {
-	                        setActiveDropZone((current) => (current === 'pool' ? null : current));
-	                      }}
-	                      onDrop={(event) => {
-	                        event.preventDefault();
-	                        handleDropToBucket('pool');
-	                      }}
-	                    >
-	                      {focusedPoolCourseIds.map((id) => {
-	                        const course = getCourse(id);
-	                        return course ? (
-	                          <CourseCard
-	                            key={id}
-	                            course={course}
-	                            draggable
-	                            isSelected={selectedCourseId === id}
-	                            onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
-	                          />
-	                        ) : null;
-	                      })}
-	                      {focusedPoolCourseIds.length === 0 && (
-	                        <div className="text-sm text-gray-500 italic p-3 col-span-full">
-	                          No focused course suggestions remain for this step.
-	                        </div>
-	                      )}
-	                    </div>
-	                  </div>
-
-	                  <details className="rounded-xl border border-gray-200 bg-gray-50">
-	                    <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900">
-	                      Courses Not Placed Yet ({secondaryPoolCourseIds.length})
-	                    </summary>
-	                    <div className="border-t border-gray-200 p-4">
-	                      {secondaryPoolCourseIds.length > 0 ? (
-	                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-	                          {secondaryPoolCourseIds.map((id) => {
-	                            const course = getCourse(id);
-	                            return course ? (
-	                              <CourseCard
-	                                key={id}
-	                                course={course}
-	                                draggable
-	                                isSelected={selectedCourseId === id}
-	                                onSelect={() => setSelectedCourseId((current) => (current === id ? null : id))}
-	                              />
-	                            ) : null;
-	                          })}
-	                        </div>
-	                      ) : (
-	                        <div className="text-sm text-gray-500">Everything in the pool is already part of the current focus, or the pool is empty.</div>
-	                      )}
-	                    </div>
-	                  </details>
-	                </div>
-	              </div>
-
-	              <div id="section-meeting-prep" className={`bg-white rounded-xl shadow-md border border-gray-200 p-5 scroll-mt-4 transition-shadow ${playbookHighlight === 'section-meeting-prep' ? 'ring-2 ring-blue-400 ring-offset-4' : ''}`}>
-	                <h3 className="text-lg font-bold text-gray-900 mb-1">After Planning: Parent Meeting Prep</h3>
-	                <p className="text-sm text-gray-600 mb-4">
-	                  Use this after the course placements are in a good spot.
-	                </p>
-	                <div className="bg-emerald-50 border border-emerald-200 rounded p-3 mb-4">
-	                  <div className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Estimated College Savings</div>
-	                  <div className="text-2xl font-black text-emerald-800 mt-1">
-	                    ${estimatedParentSavings.toLocaleString()}
-	                  </div>
-	                  <div className="text-xs text-emerald-700 mt-1">
-	                    Based on assigned credits ({assignedProgress.totalCredits}) x ${ESTIMATED_TUITION_PER_CREDIT}/credit.
-	                  </div>
-	                </div>
-	                <div className="space-y-2">
-	                  {parentPrepQuestions.map((question) => (
-	                    <div key={question} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
-	                      {question}
-	                    </div>
-	                  ))}
-	                </div>
-	              </div>
-	            </div>
-
-	            <div className="space-y-6 xl:sticky xl:top-6">
-	              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-	                <div className="flex items-center justify-between gap-3 mb-4">
-	                  <div>
-	                    <h3 className="text-lg font-bold text-gray-900">College Requirement Checklist</h3>
-	                    <p className="text-sm text-gray-600 mt-1">
-	                      Watch this update as you place courses.
-	                    </p>
-	                  </div>
-	                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-semibold">
-	                    {assignedProgress.satisfiedCategories.size}/9 covered
-	                  </span>
-	                </div>
-
-	                {assignedProgress.missingCategories.length > 0 ? (
-	                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-	                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Still missing</div>
-	                    <div className="mt-2 flex flex-wrap gap-2">
-	                      {assignedProgress.missingCategories.map((category) => (
-	                        <span key={category} className="px-2 py-1 rounded-full bg-white border border-amber-200 text-xs font-medium text-amber-900">
-	                          {category}
-	                        </span>
-	                      ))}
-	                    </div>
-	                  </div>
-	                ) : (
-	                  <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
-	                    All General Education categories are currently covered.
-	                  </div>
-	                )}
-
-	                <div className="grid grid-cols-2 gap-2">
-	                  {REQUIRED_CATEGORIES.map((cat) => {
-	                    const isDone = assignedProgress.satisfiedCategories.has(cat);
-	                    return (
-	                      <div key={cat} className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${isDone ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
-	                        {isDone ? <CheckCircle className="w-4 h-4 text-green-600 shrink-0" /> : <Circle className="w-4 h-4 text-gray-300 shrink-0" />}
-	                        <span className={`text-xs font-medium leading-tight ${isDone ? 'text-green-800' : 'text-gray-500'}`}>{cat}</span>
-	                      </div>
-	                    );
-	                  })}
-	                </div>
-
-	                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-	                  <div className={`rounded-lg border p-3 ${assignedProgress.residencyCredits >= 20 ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}`}>
-	                    <div className="text-xs uppercase tracking-wide font-semibold text-gray-700">Residency progress</div>
-	                    <div className="text-lg font-bold text-gray-900 mt-1">{assignedProgress.residencyCredits}/20 CE credits</div>
-	                  </div>
-	                  <div className={`rounded-lg border p-3 ${selectedAssignments.pool.length === 0 ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
-	                    <div className="text-xs uppercase tracking-wide font-semibold text-gray-700">Placement progress</div>
-	                    <div className="text-lg font-bold text-gray-900 mt-1">{selectedAssignments.pool.length} courses left in pool</div>
-	                  </div>
-	                </div>
-	              </div>
-	            </div>
-	          </div>
-	        </div>
-
-	        {/* SECTION: COUNSELOR TALKING POINTS */}
-	        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
-	          <h3 className="text-lg font-bold text-gray-900 mb-1">Final Meeting Talking Points</h3>
-	          <p className="text-sm text-gray-600 mb-4">
-	            These unlock once the plan is fully placed.
-	          </p>
-
-          {isAllCoursesAssigned ? (
-            <div className="space-y-2">
-              {talkingPoints.map((point) => (
-                <div key={point} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
-                  {point}
-                </div>
-              ))}
+        {/* ============ SECTION A: COUNSELOR WORKSPACE ============ */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 bg-slate-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <School className="w-5 h-5 text-slate-300" />
+              <h3 className="text-base font-bold text-white">Counselor Workspace</h3>
             </div>
-	          ) : (
-	            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
-	              Finish placing the remaining pool courses to unlock final meeting talking points.
-	              <div className="text-xs mt-1">Remaining in pool: {selectedAssignments.pool.length}</div>
-	            </div>
-	          )}
-	        </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-bold ${isAllCoursesAssigned && assignedProgress.missingCategories.length === 0 ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300'}`}>
+              {isAllCoursesAssigned && assignedProgress.missingCategories.length === 0 ? 'Ready for Meeting' : `${selectedAssignments.pool.length} course${selectedAssignments.pool.length !== 1 ? 's' : ''} to place`}
+            </div>
+          </div>
+
+          <div className="p-5">
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_0.85fr] gap-5">
+              {/* Left column: Do This Next + course pool */}
+              <div className="space-y-4">
+                {/* Recommendation card — only when there's work */}
+                {studentNextStep && studentNextStepCourse && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-blue-600 mb-1">Next Move</div>
+                    <div className="text-base font-bold text-blue-950">{studentNextStepCourse.name}</div>
+                    <div className="text-sm text-blue-800 mt-1">{studentNextStep.reason}</div>
+                    <div className="flex items-center gap-3 mt-3">
+                      <button
+                        onClick={handleApplyRecommendation}
+                        className="text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 font-semibold transition-colors"
+                      >
+                        Add to {YEAR_LABELS[studentNextStep.targetYear]}
+                      </button>
+                      {primaryMissingCategory && (
+                        <span className="text-xs text-blue-600 font-medium">Filling: {primaryMissingCategory}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {lastAppliedMove && (
+                  <div className="rounded-lg border border-green-300 bg-green-50 px-4 py-2.5 flex items-center gap-2.5 animate-[fadeSlideIn_0.3s_ease-out]">
+                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                    <div className="text-sm text-green-900">
+                      <span className="font-semibold">{lastAppliedMove.courseName}</span> placed in {lastAppliedMove.yearLabel}
+                    </div>
+                  </div>
+                )}
+
+                {/* Course pool — only when courses remain */}
+                {(focusedPoolCourseIds.length > 0 || secondaryPoolCourseIds.length > 0) && (
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Available Courses</div>
+                    <div
+                      className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 rounded-xl border-2 border-dashed p-3 transition-colors ${
+                        activeDropZone === 'pool' ? 'border-blue-300 bg-blue-50/40' : 'border-gray-100 bg-gray-50/40'
+                      }`}
+                      onDragOver={(event) => { event.preventDefault(); setActiveDropZone('pool'); }}
+                      onDragLeave={() => setActiveDropZone((c) => (c === 'pool' ? null : c))}
+                      onDrop={(event) => { event.preventDefault(); handleDropToBucket('pool'); }}
+                    >
+                      {focusedPoolCourseIds.map((id) => {
+                        const course = getCourse(id);
+                        return course ? (
+                          <CourseCard key={id} course={course} draggable isSelected={selectedCourseId === id} onSelect={() => setSelectedCourseId((c) => (c === id ? null : id))} />
+                        ) : null;
+                      })}
+                      {secondaryPoolCourseIds.map((id) => {
+                        const course = getCourse(id);
+                        return course ? (
+                          <CourseCard key={id} course={course} draggable isSelected={selectedCourseId === id} onSelect={() => setSelectedCourseId((c) => (c === id ? null : id))} />
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* All done state */}
+                {isAllCoursesAssigned && !studentNextStep && (
+                  <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-center gap-3">
+                    <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-green-900 text-sm">All courses placed</div>
+                      <div className="text-xs text-green-700 mt-0.5">Scroll down to Family Meeting Prep for parent-ready materials.</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right column: Requirement Checklist (sticky) */}
+              <div className="xl:sticky xl:top-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Requirements</div>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${assignedProgress.missingCategories.length === 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {assignedProgress.satisfiedCategories.size}/9 Gen Ed
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 mb-3">
+                  {REQUIRED_CATEGORIES.map((cat) => {
+                    const isDone = assignedProgress.satisfiedCategories.has(cat);
+                    return (
+                      <div key={cat} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors ${isDone ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                        {isDone ? <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <Circle className="w-3.5 h-3.5 text-gray-300 shrink-0" />}
+                        <span className={`text-[11px] font-medium leading-tight ${isDone ? 'text-green-800' : 'text-gray-500'}`}>{cat}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className={`rounded-lg border p-2.5 ${assignedProgress.residencyCredits >= 20 ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}`}>
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-gray-500">CE Credits</div>
+                    <div className="text-base font-bold text-gray-900">{assignedProgress.residencyCredits}/20</div>
+                  </div>
+                  <div className={`rounded-lg border p-2.5 ${selectedAssignments.pool.length === 0 ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Pool</div>
+                    <div className="text-base font-bold text-gray-900">{selectedAssignments.pool.length} left</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ============ SECTION B: FAMILY MEETING PREP ============ */}
+        <div id="section-meeting-prep" className={`bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden scroll-mt-4 transition-shadow ${playbookHighlight === 'section-meeting-prep' ? 'ring-2 ring-blue-400 ring-offset-4' : ''}`}>
+          <div className="px-5 py-4 bg-emerald-800 flex items-center gap-3">
+            <Heart className="w-5 h-5 text-emerald-200" />
+            <h3 className="text-base font-bold text-white">Family Meeting Prep</h3>
+          </div>
+
+          <div className="p-5">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-5">
+              {/* Left: Savings hero */}
+              <div>
+                <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 p-5">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Estimated Family Savings</div>
+                  <div className="text-4xl font-black text-emerald-800">${estimatedParentSavings.toLocaleString()}</div>
+                  <div className="text-xs text-emerald-600 mt-1">{assignedProgress.totalCredits} credits x ${ESTIMATED_TUITION_PER_CREDIT}/credit</div>
+                </div>
+                <button
+                  onClick={handleDownloadPdf}
+                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl text-white px-4 py-3 text-sm font-bold shadow-md transition-all hover:brightness-110 active:scale-[0.97]"
+                  style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
+                >
+                  <Download className="w-4 h-4" />
+                  Download Family Roadmap PDF
+                </button>
+              </div>
+
+              {/* Right: Talking points */}
+              <div>
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Conversation Script</div>
+                {isAllCoursesAssigned ? (
+                  <div className="space-y-2">
+                    {talkingPoints.map((point) => (
+                      <div key={point} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                    {parentPrepQuestions.map((question) => (
+                      <div key={question} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>{question}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {parentPrepQuestions.map((question) => (
+                      <div key={question} className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>{question}</span>
+                      </div>
+                    ))}
+                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                      Place remaining {selectedAssignments.pool.length} course{selectedAssignments.pool.length !== 1 ? 's' : ''} to unlock full talking points.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
 	        {/* SECTION 4: FULL CATALOG - GROUPED */}
 	        <div className="bg-white rounded-xl shadow-md border border-gray-200">
