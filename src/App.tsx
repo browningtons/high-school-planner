@@ -74,6 +74,17 @@ interface ImporterPathwayRoleCard {
   toneClass: string;
 }
 
+interface AnalyticsEvent {
+  type: 'page_view' | 'pathway_click' | 'optimizer_run' | 'pdf_download' | 'share_family' | 'link_copied' | 'importer_opened';
+  timestamp: number;
+  metadata?: Record<string, string>;
+}
+
+interface AnalyticsStore {
+  events: AnalyticsEvent[];
+  firstSeen: number;
+}
+
 interface ImportedPathwayOption {
   code: string;
   name: string;
@@ -456,8 +467,208 @@ const parseCsvLine = (line: string): string[] => {
   return values;
 };
 
-// --- COMPONENTS ---
+// --- ANALYTICS ---
 
+const ANALYTICS_KEY = 'hsp_analytics';
+
+function loadAnalytics(): AnalyticsStore {
+  try {
+    const raw = localStorage.getItem(ANALYTICS_KEY);
+    if (raw) return JSON.parse(raw) as AnalyticsStore;
+  } catch { /* ignore */ }
+  return { events: [], firstSeen: Date.now() };
+}
+
+function trackEvent(type: AnalyticsEvent['type'], metadata?: Record<string, string>): void {
+  const store = loadAnalytics();
+  store.events.push({ type, timestamp: Date.now(), metadata });
+  if (store.events.length > 10000) store.events = store.events.slice(-5000);
+  localStorage.setItem(ANALYTICS_KEY, JSON.stringify(store));
+}
+
+function clearAnalytics(): void {
+  localStorage.removeItem(ANALYTICS_KEY);
+}
+
+function formatRelativeTime(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+const EVENT_LABELS: Record<AnalyticsEvent['type'], string> = {
+  page_view: 'Page View',
+  pathway_click: 'Pathway Selected',
+  optimizer_run: 'Optimizer Run',
+  pdf_download: 'PDF Downloaded',
+  share_family: 'Share with Family',
+  link_copied: 'Link Copied',
+  importer_opened: 'Importer Opened',
+};
+
+const EVENT_COLORS: Record<AnalyticsEvent['type'], string> = {
+  page_view: 'bg-slate-400',
+  pathway_click: 'bg-orange-500',
+  optimizer_run: 'bg-blue-500',
+  pdf_download: 'bg-emerald-500',
+  share_family: 'bg-pink-500',
+  link_copied: 'bg-violet-500',
+  importer_opened: 'bg-cyan-500',
+};
+
+const AdminDashboard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const [store, setStore] = useState(() => loadAnalytics());
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const events = store.events;
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const e of events) c[e.type] = (c[e.type] || 0) + 1;
+    return c;
+  }, [events]);
+
+  const uniqueDays = useMemo(() => {
+    const days = new Set(events.map((e) => new Date(e.timestamp).toDateString()));
+    return days.size;
+  }, [events]);
+
+  const pathwayCounts = useMemo(() => {
+    const pc: Record<string, number> = {};
+    for (const e of events) {
+      if (e.type === 'pathway_click' && e.metadata?.pathwayName) {
+        pc[e.metadata.pathwayName] = (pc[e.metadata.pathwayName] || 0) + 1;
+      }
+    }
+    return Object.entries(pc).sort((a, b) => b[1] - a[1]);
+  }, [events]);
+
+  const maxPathwayCount = pathwayCounts.length > 0 ? pathwayCounts[0][1] : 1;
+
+  const recentEvents = useMemo(() => events.slice(-50).reverse(), [events]);
+
+  const handleClear = () => {
+    clearAnalytics();
+    setStore({ events: [], firstSeen: Date.now() });
+    setConfirmClear(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <div className="bg-slate-900 text-white">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white transition-colors">
+              <ArrowRight className="w-4 h-4 rotate-180" />
+              Back to Planner
+            </button>
+            <div className="h-5 w-px bg-slate-700" />
+            <h1 className="text-lg font-bold">Admin Analytics</h1>
+          </div>
+          <div className="text-xs text-slate-400">
+            Tracking since {new Date(store.firstSeen).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+        {/* Stat Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Visits', value: counts.page_view || 0, color: 'border-slate-300' },
+            { label: 'Days Active', value: uniqueDays, color: 'border-blue-300' },
+            { label: 'Optimizer Runs', value: counts.optimizer_run || 0, color: 'border-orange-300' },
+            { label: 'PDF Downloads', value: counts.pdf_download || 0, color: 'border-emerald-300' },
+          ].map((stat) => (
+            <div key={stat.label} className={`bg-white rounded-xl shadow-sm border-2 p-5 ${stat.color}`}>
+              <div className="text-xs font-bold uppercase tracking-widest text-gray-500">{stat.label}</div>
+              <div className="text-3xl font-black text-gray-900 mt-1">{stat.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Popular Pathways */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <h3 className="text-sm font-bold text-gray-900 mb-4">Popular Pathways</h3>
+            {pathwayCounts.length === 0 ? (
+              <div className="text-sm text-gray-400 italic">No pathway data yet</div>
+            ) : (
+              <div className="space-y-3">
+                {pathwayCounts.map(([name, count]) => (
+                  <div key={name}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">{name}</span>
+                      <span className="text-xs font-bold text-gray-500">{count}</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${(count / maxPathwayCount) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action Breakdown */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <h3 className="text-sm font-bold text-gray-900 mb-4">Action Breakdown</h3>
+            <div className="space-y-2">
+              {(Object.keys(EVENT_LABELS) as AnalyticsEvent['type'][]).map((type) => (
+                <div key={type} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-2.5 h-2.5 rounded-full ${EVENT_COLORS[type]}`} />
+                    <span className="text-sm text-gray-700">{EVENT_LABELS[type]}</span>
+                  </div>
+                  <span className="text-sm font-bold text-gray-900">{counts[type] || 0}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Timeline */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-4">Recent Activity</h3>
+          {recentEvents.length === 0 ? (
+            <div className="text-sm text-gray-400 italic">No activity recorded yet</div>
+          ) : (
+            <div className="max-h-96 overflow-y-auto space-y-1.5">
+              {recentEvents.map((event, i) => (
+                <div key={i} className="flex items-center gap-3 py-1.5 text-sm">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${EVENT_COLORS[event.type]}`} />
+                  <span className="text-gray-700 flex-grow">
+                    {EVENT_LABELS[event.type]}
+                    {event.metadata?.pathwayName && <span className="text-gray-400"> -- {event.metadata.pathwayName}</span>}
+                  </span>
+                  <span className="text-xs text-gray-400 shrink-0">{formatRelativeTime(event.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Clear button */}
+        <div className="flex justify-end">
+          {confirmClear ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Clear all analytics data?</span>
+              <button onClick={handleClear} className="rounded-lg bg-red-600 text-white px-4 py-2 text-sm font-semibold hover:bg-red-500">Yes, clear</button>
+              <button onClick={() => setConfirmClear(false)} className="rounded-lg border border-gray-300 bg-white text-gray-700 px-4 py-2 text-sm font-semibold hover:bg-gray-50">Cancel</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmClear(true)} className="text-sm text-gray-400 hover:text-red-500 transition-colors">
+              Clear analytics data
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- COMPONENTS ---
 
 const BOOKING_URL = 'mailto:browningtons@gmail.com?subject=School%20Planner%20-%20Schedule%20a%2015-Min%20Call';
 
@@ -507,6 +718,7 @@ const App: React.FC = () => {
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [shareEmail, setShareEmail] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
+  const [showAdminView, setShowAdminView] = useState(() => window.location.hash === '#admin');
   const [stage2ShowInline, setStage2ShowInline] = useState(false);
   const [stage2Picks, setStage2Picks] = useState<Record<string, string>>({});
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
@@ -543,6 +755,14 @@ const App: React.FC = () => {
     setPreviewSchoolName(preset.name);
     setSchoolColors(preset.colors);
     if (preset.logo) setSchoolLogoUrl(preset.logo);
+  }, []);
+
+  // Analytics: track page view on mount + listen for hash changes
+  useEffect(() => { trackEvent('page_view'); }, []);
+  useEffect(() => {
+    const onHash = () => setShowAdminView(window.location.hash === '#admin');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   // Apply school brand colors as CSS custom properties
@@ -950,6 +1170,7 @@ const App: React.FC = () => {
   };
 
   const handleOptimize = () => {
+    trackEvent('optimizer_run', { pathwayId: selectedPathId });
     const path = selectedPath;
     const allPathCourseIds = new Set([
       ...path.schedule.grade10, ...path.schedule.grade11, ...path.schedule.grade12,
@@ -1146,6 +1367,7 @@ const App: React.FC = () => {
   };
 
   const handleDownloadPdf = () => {
+    trackEvent('pdf_download', { pathwayId: selectedPathId });
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
     const pageW = 612;
     const ml = 36;
@@ -1640,6 +1862,10 @@ const App: React.FC = () => {
   const templateCsvUrl = `${import.meta.env.BASE_URL}school_planner_template.csv`;
   const dataDictionaryCsvUrl = `${import.meta.env.BASE_URL}data_dictionary.csv`;
 
+  if (showAdminView) {
+    return <AdminDashboard onBack={() => { window.location.hash = ''; setShowAdminView(false); }} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-24">
       {/* Top Banner (Solid Background) — uses school primary color */}
@@ -1648,7 +1874,7 @@ const App: React.FC = () => {
           
           <div className="flex flex-col md:flex-row md:items-center gap-5">
           {/* Logo */}
-          <div className="hidden md:block w-20 h-20 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative">
+          <div className="hidden md:block w-20 h-20 bg-white/10 rounded-full border-4 border-white/20 overflow-hidden shadow-lg flex-shrink-0 relative cursor-pointer" onDoubleClick={() => { window.location.hash = 'admin'; }}>
             <img
               src={schoolLogoUrl || 'tiger-logo.png'}
               alt={`${previewSchoolName || 'School'} logo`}
@@ -1676,7 +1902,7 @@ const App: React.FC = () => {
           {/* Single CTA */}
           <div className="flex-shrink-0">
             <button
-              onClick={() => setIsImporterOpen(true)}
+              onClick={() => { setIsImporterOpen(true); trackEvent('importer_opened'); }}
               className="inline-flex items-center gap-2 rounded-xl text-white px-6 py-3 text-sm font-extrabold shadow-lg transition-all hover:brightness-110 active:scale-[0.97]"
               style={{ backgroundColor: schoolColors[1] || '#ea580c' }}
             >
@@ -1694,7 +1920,7 @@ const App: React.FC = () => {
                 return (
                   <button
                     key={path.id}
-                    onClick={() => setSelectedPathId(path.id)}
+                    onClick={() => { setSelectedPathId(path.id); trackEvent('pathway_click', { pathwayId: path.id, pathwayName: path.name }); }}
                     className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all font-medium whitespace-nowrap ${
                       selectedPathId === path.id
                         ? 'text-white shadow-lg scale-[1.02]'
@@ -2432,7 +2658,7 @@ const App: React.FC = () => {
                   Download Family Roadmap PDF
                 </button>
                 <button
-                  onClick={() => setShowSharePanel(!showSharePanel)}
+                  onClick={() => { if (!showSharePanel) trackEvent('share_family'); setShowSharePanel(!showSharePanel); }}
                   className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors"
                 >
                   <Mail className="w-4 h-4" />
@@ -2466,6 +2692,7 @@ const App: React.FC = () => {
                         onClick={() => {
                           const url = `${window.location.origin}${window.location.pathname}${window.location.search}`;
                           navigator.clipboard.writeText(url).then(() => {
+                            trackEvent('link_copied');
                             setShareCopied(true);
                             setTimeout(() => setShareCopied(false), 2500);
                           });
