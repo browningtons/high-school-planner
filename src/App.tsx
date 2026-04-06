@@ -247,6 +247,47 @@ const REQUIRED_IMPORT_COLUMNS = [
 
 const FREE_PREVIEW_ROW_LIMIT = 25;
 
+// --- SCHOOL PRESETS (for ?school= URL param) ---
+interface SchoolPreset {
+  slug: string;
+  name: string;
+  logo?: string;
+  colors: string[]; // [primary, accent, bg, secondary, highlight]
+}
+
+const SCHOOL_PRESETS: SchoolPreset[] = [
+  {
+    slug: 'ogden-high',
+    name: 'Ogden High School',
+    logo: '',
+    colors: ['#1a237e', '#c62828', '#ffffff', '#283593', '#e53935'],
+  },
+  {
+    slug: 'ben-lomond',
+    name: 'Ben Lomond High School',
+    logo: '',
+    colors: ['#1b5e20', '#ffc107', '#ffffff', '#2e7d32', '#ffca28'],
+  },
+  {
+    slug: 'weber-high',
+    name: 'Weber High School',
+    logo: '',
+    colors: ['#4a148c', '#ff6f00', '#ffffff', '#6a1b9a', '#ff8f00'],
+  },
+  {
+    slug: 'fremont-high',
+    name: 'Fremont High School',
+    logo: '',
+    colors: ['#b71c1c', '#212121', '#ffffff', '#c62828', '#424242'],
+  },
+  {
+    slug: 'bonneville-high',
+    name: 'Bonneville High School',
+    logo: '',
+    colors: ['#0d47a1', '#e65100', '#ffffff', '#1565c0', '#ef6c00'],
+  },
+];
+
 const IMPORTER_COLOR_SCHEMES = [
   { id: 'classic-navy', label: 'Classic Navy', accentHex: '#1d4ed8', previewClass: 'border-blue-200 bg-blue-50' },
   { id: 'forest', label: 'Forest', accentHex: '#15803d', previewClass: 'border-emerald-200 bg-emerald-50' },
@@ -463,6 +504,9 @@ const App: React.FC = () => {
   const [optimizeFlash, setOptimizeFlash] = useState(false);
   const [optimizeAnimColumns, setOptimizeAnimColumns] = useState<Set<number>>(new Set());
   const [showPdfToast, setShowPdfToast] = useState(false);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareCopied, setShareCopied] = useState(false);
   const [stage2ShowInline, setStage2ShowInline] = useState(false);
   const [stage2Picks, setStage2Picks] = useState<Record<string, string>>({});
   const [completedSetupStepIds, setCompletedSetupStepIds] = useState<string[]>(() => {
@@ -488,6 +532,18 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('path_assignments', JSON.stringify(pathAssignments));
   }, [pathAssignments]);
+
+  // Load school preset from URL param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('school');
+    if (!slug) return;
+    const preset = SCHOOL_PRESETS.find((p) => p.slug === slug);
+    if (!preset) return;
+    setPreviewSchoolName(preset.name);
+    setSchoolColors(preset.colors);
+    if (preset.logo) setSchoolLogoUrl(preset.logo);
+  }, []);
 
   // Apply school brand colors as CSS custom properties
   useEffect(() => {
@@ -2375,6 +2431,52 @@ const App: React.FC = () => {
                   <Download className="w-4 h-4" />
                   Download Family Roadmap PDF
                 </button>
+                <button
+                  onClick={() => setShowSharePanel(!showSharePanel)}
+                  className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  Share with Family
+                </button>
+
+                {showSharePanel && (
+                  <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3 animate-[fadeSlideIn_0.2s_ease-out]">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Email roadmap to parent</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          placeholder="parent@email.com"
+                          value={shareEmail}
+                          onChange={(e) => setShareEmail(e.target.value)}
+                          className="flex-grow rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        />
+                        <a
+                          href={`mailto:${shareEmail}?subject=${encodeURIComponent(`${previewSchoolName} - Your Child's College Credit Roadmap`)}&body=${encodeURIComponent(`Hi,\n\nAttached is your child's personalized college credit roadmap from ${previewSchoolName}.\n\nThis plan could save your family an estimated $${estimatedParentSavings.toLocaleString()} in college tuition by earning ${assignedProgress.totalCredits} credits during high school.\n\nPlease download the PDF roadmap and review the course plan. If you have questions, reach out to your school counselor.\n\nBest regards,\n${previewSchoolName} Counseling Team`)}`}
+                          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${shareEmail.includes('@') ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-gray-200 text-gray-400 pointer-events-none'}`}
+                        >
+                          Send
+                        </a>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">Opens your email client with a pre-filled message. Attach the PDF before sending.</p>
+                    </div>
+                    <div className="border-t border-gray-200 pt-3">
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Or copy a shareable link</label>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+                          navigator.clipboard.writeText(url).then(() => {
+                            setShareCopied(true);
+                            setTimeout(() => setShareCopied(false), 2500);
+                          });
+                        }}
+                        className={`w-full flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${shareCopied ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        {shareCopied ? <><Check className="w-3.5 h-3.5" /> Link copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy planner link</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right: Talking points */}
