@@ -272,7 +272,7 @@ const SCHOOL_PRESETS: SchoolPreset[] = [
     slug: 'weber-high',
     name: 'Weber High School',
     logo: '/weber.png',
-    colors: ['#949599', '#e42526', '#ffffff', '#7a7a7e', '#f04041'],
+    colors: ['#2d2d2f', '#e42526', '#ffffff', '#949599', '#f04041'],
   },
   {
     slug: 'fremont-high',
