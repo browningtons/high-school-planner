@@ -259,31 +259,31 @@ const SCHOOL_PRESETS: SchoolPreset[] = [
   {
     slug: 'ogden-high',
     name: 'Ogden High School',
-    logo: '',
-    colors: ['#1a237e', '#c62828', '#ffffff', '#283593', '#e53935'],
+    logo: '/ogden_high.png',
+    colors: ['#000000', '#fdc228', '#ffffff', '#1a1a1a', '#fdd05a'],
   },
   {
     slug: 'ben-lomond',
     name: 'Ben Lomond High School',
-    logo: '',
+    logo: '/ben_lomond.png',
     colors: ['#0a59a4', '#d43c39', '#ffffff', '#0d6abf', '#e05350'],
   },
   {
     slug: 'weber-high',
     name: 'Weber High School',
-    logo: '',
+    logo: '/weber.png',
     colors: ['#949599', '#e42526', '#ffffff', '#7a7a7e', '#f04041'],
   },
   {
     slug: 'fremont-high',
     name: 'Fremont High School',
-    logo: '',
+    logo: '/fremont.png',
     colors: ['#25367b', '#f5ffff', '#ffffff', '#1e2d6b', '#c8d6d6'],
   },
   {
     slug: 'bonneville-high',
     name: 'Bonneville High School',
-    logo: '',
+    logo: '/bonneville.png',
     colors: ['#12233f', '#fdc228', '#ffffff', '#1a3050', '#fdd05a'],
   },
 ];
