@@ -278,7 +278,7 @@ const SCHOOL_PRESETS: SchoolPreset[] = [
     slug: 'fremont-high',
     name: 'Fremont High School',
     logo: '/fremont.png',
-    colors: ['#25367b', '#f5ffff', '#ffffff', '#1e2d6b', '#c8d6d6'],
+    colors: ['#25367b', '#3a50a0', '#f5ffff', '#1e2d6b', '#8494c7'],
   },
   {
     slug: 'bonneville-high',
