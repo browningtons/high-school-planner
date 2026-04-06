@@ -260,7 +260,7 @@ const SCHOOL_PRESETS: SchoolPreset[] = [
     slug: 'ogden-high',
     name: 'Ogden High School',
     logo: '/ogden_high.png',
-    colors: ['#000000', '#fdc228', '#ffffff', '#1a1a1a', '#fdd05a'],
+    colors: ['#000000', '#e05f27', '#ffffff', '#1a1a1a', '#f07a45'],
   },
   {
     slug: 'ben-lomond',
