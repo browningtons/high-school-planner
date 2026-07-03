@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Download, DollarSign, GraduationCap, School, Sparkles, Upload, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Download, DollarSign, FileText, GraduationCap, School, Sparkles, Upload, Users } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { ESTIMATED_TUITION_PER_CREDIT, SCHOOL_PRESETS, SKILL_PATHS, YEAR_LABELS } from './schoolData';
 import type { SkillPath } from './schoolData';
 import {
@@ -9,7 +10,8 @@ import {
   rosterTemplateCsv,
   runDraft,
 } from './draftEngine';
-import type { RosterStudent } from './draftEngine';
+import type { DraftResult, RosterStudent } from './draftEngine';
+import type { SchoolPreset } from './schoolData';
 
 const PATH_TONES: Record<SkillPath['id'], { bar: string; chip: string }> = {
   tech: { bar: 'bg-sky-500', chip: 'bg-sky-100 text-sky-800' },
@@ -31,6 +33,108 @@ function downloadFile(filename: string, content: string, type = 'text/csv') {
 }
 
 const STUDENT_TABLE_LIMIT = 100;
+
+// One-page class summary for principals/admins: headline stats, pathway
+// distribution, and the top of the section-demand table.
+function downloadSummaryPdf(result: DraftResult, school: SchoolPreset | null) {
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' }); // 612 x 792
+  const ml = 48;
+  const headerColor = school?.colors[0] ?? '#0f172a';
+
+  doc.setFillColor(headerColor);
+  doc.rect(0, 0, 612, 92, 'F');
+  doc.setTextColor('#ffffff');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.text('Draft Day — Class Summary', ml, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(school ? school.name : 'Incoming class pathway draft', ml, 64);
+
+  const stats = [
+    ['Students drafted', num.format(result.totals.students)],
+    ['Projected tuition savings', money.format(result.totals.savings)],
+    ['College credits earned', num.format(result.totals.credits)],
+    ['Avg credits / student', String(result.totals.avgCredits)],
+  ];
+  const boxW = 123;
+  stats.forEach(([label, value], i) => {
+    const x = ml + i * (boxW + 8);
+    doc.setFillColor('#f8fafc');
+    doc.setDrawColor('#e2e8f0');
+    doc.roundedRect(x, 116, boxW, 62, 6, 6, 'FD');
+    doc.setTextColor('#0f172a');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text(value, x + 10, 144);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor('#64748b');
+    doc.text(label, x + 10, 162);
+  });
+
+  let y = 214;
+  doc.setTextColor('#0f172a');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Pathway distribution', ml, y);
+  y += 16;
+  const tones: Record<string, string> = { tech: '#0ea5e9', health: '#10b981', business: '#f59e0b', social: '#8b5cf6' };
+  for (const path of SKILL_PATHS) {
+    const count = result.pathwayCounts[path.id];
+    const pct = result.totals.students ? count / result.totals.students : 0;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor('#334155');
+    doc.text(path.name, ml, y + 9);
+    doc.setFillColor('#f1f5f9');
+    doc.rect(ml + 170, y, 260, 11, 'F');
+    doc.setFillColor(tones[path.id]);
+    doc.rect(ml + 170, y, Math.max(2, 260 * pct), 11, 'F');
+    doc.setTextColor('#0f172a');
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${num.format(count)} (${Math.round(pct * 100)}%)`, ml + 442, y + 9);
+    y += 20;
+  }
+
+  y += 18;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(`Section planning (top courses, ${result.sectionSize} students/section)`, ml, y);
+  y += 18;
+  doc.setFontSize(8);
+  doc.setTextColor('#64748b');
+  const cols = [ml, ml + 240, ml + 310, ml + 390, ml + 470];
+  ['Course', 'Type', 'Year', 'Students', 'Sections'].forEach((h, i) => doc.text(h, cols[i], y));
+  y += 6;
+  doc.setDrawColor('#e2e8f0');
+  doc.line(ml, y, 612 - ml, y);
+  y += 14;
+  doc.setTextColor('#0f172a');
+  for (const d of result.seatDemand.slice(0, 16)) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(d.courseName.slice(0, 48), cols[0], y);
+    doc.text(d.courseType, cols[1], y);
+    doc.text(YEAR_LABELS[d.grade], cols[2], y);
+    doc.text(num.format(d.students), cols[3], y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(String(d.sections), cols[4], y);
+    y += 16;
+  }
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor('#94a3b8');
+  doc.text(
+    `Demo estimates from this planner's course catalog at $${ESTIMATED_TUITION_PER_CREDIT}/credit — verify against current school, district, and university catalogs before official advising.`,
+    ml,
+    768,
+    { maxWidth: 612 - ml * 2 },
+  );
+
+  doc.save('draft_day_class_summary.pdf');
+}
 
 const DraftDay: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const school = useMemo(() => {
@@ -178,6 +282,15 @@ const DraftDay: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
         {result && !revealing && (
           <>
+            <div className="flex justify-end">
+              <button
+                onClick={() => downloadSummaryPdf(result, school)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-700"
+              >
+                <FileText className="w-4 h-4" /> Download class summary (PDF)
+              </button>
+            </div>
+
             {/* Headline stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
