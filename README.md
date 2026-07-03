@@ -14,6 +14,9 @@ The app helps a student or family compare pathway options, understand how AP/IB/
 - Includes counselor/advisor contact context.
 - Supports family sharing, PDF export, and link-copy flows.
 - Includes an onboarding CSV generator for pathway import/demo prep.
+- Draft Day counselor demo (`/#draft`): load an incoming-class roster CSV and
+  auto-draft every student into a pathway, with class-level tuition savings and
+  section/seat-demand planning. Works with `?school=` presets for branded demos.
 
 ## Local Setup
 
@@ -40,9 +43,13 @@ npm run onboarding:csv  # generate onboarding/pathway CSV artifact
 ## Project Structure
 
 ```text
-src/App.tsx             # app shell, course data, pathway logic, export flows
-scripts/                # CSV generation helpers
+src/App.tsx             # app shell, pathway logic, export flows
+src/schoolData.ts       # course catalog, pathways, school presets (shared data)
+src/DraftDay.tsx        # Draft Day counselor demo (roster auto-draft dashboard)
+src/draftEngine.ts      # roster parsing + batch pathway assignment engine
+scripts/                # CSV generation helpers + outreach list builder
 onboarding/             # onboarding artifacts
+outreach/               # outreach contact-list workflow (see outreach/README.md)
 public/                 # static assets
 ONBOARDING_V1_SPEC.md   # onboarding/data import specification
 ```
