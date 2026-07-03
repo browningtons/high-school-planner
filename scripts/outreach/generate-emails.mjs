@@ -86,7 +86,10 @@ function addDays(isoDate, days) {
 
 function demoUrl(baseUrl, demoSlug) {
   const preset = PRESET_SLUGS[demoSlug];
-  return preset ? `${baseUrl}/?school=${preset}#draft` : `${baseUrl}/#draft`;
+  return {
+    url: preset ? `${baseUrl}/?school=${preset}#draft` : `${baseUrl}/#draft`,
+    branded: Boolean(preset),
+  };
 }
 
 function roundClassSize(enrollment) {
@@ -98,11 +101,19 @@ function roundClassSize(enrollment) {
 const money = (n) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 function buildSequence(contact, args) {
-  const first = (contact.contact_name || '').split(/\s+/)[0] || 'there';
+  const tokens = (contact.contact_name || '').trim().split(/\s+/).filter(Boolean);
+  let first = tokens[0] || 'there';
+  // "Mrs. K. Stringham" should greet as "Mrs. Stringham", not "Mrs." or "Mrs. K."
+  if (/^(mr|mrs|ms|miss|dr)\.?$/i.test(first) && tokens.length > 1) {
+    first = `${tokens[0]} ${tokens[tokens.length - 1]}`;
+  }
   const school = contact.school_name;
   const classSize = roundClassSize(contact.enrollment);
   const savings = money(classSize * AVG_SAVINGS_PER_STUDENT);
-  const url = demoUrl(args.baseUrl, contact.demo_slug);
+  const { url, branded } = demoUrl(args.baseUrl, contact.demo_slug);
+  const demoIntro = branded
+    ? `Here's a demo already themed for ${school}: ${url}`
+    : `Here's the demo: ${url}`;
 
   const signature = [
     args.fromName,
@@ -117,12 +128,14 @@ function buildSequence(contact, args) {
     {
       key: 'day1-demo',
       sendDate: args.startDate,
-      subject: `A course-planning demo built with ${school}'s pathways`,
+      subject: branded
+        ? `A course-planning demo built with ${school}'s pathways`
+        : `A course-planning demo for ${school} counselors`,
       body: `Hi ${first},
 
 I built a free planning tool that shows ${school} students how to leave high school with most of an associate degree already earned — and what that saves their families.
 
-Here's a demo themed for ${school}: ${url}
+${demoIntro}
 (Click "Use sample roster," then "Run the draft" — it plans a whole incoming class at once.)
 
 Would you take two minutes and tell me what it gets wrong for your students? I'm collecting honest counselor feedback before the year starts — this isn't a sales pitch.
