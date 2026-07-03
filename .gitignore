@@ -14,6 +14,9 @@ dist-ssr
 .env
 .env.*
 
+# Generated outreach data — contains contact info, never commit
+outreach/contacts*.csv
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
