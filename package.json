@@ -9,7 +9,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "onboarding:csv": "node scripts/generate-onboarding-csv.mjs"
+    "onboarding:csv": "node scripts/generate-onboarding-csv.mjs",
+    "outreach:list": "node scripts/outreach/build-contact-list.mjs",
+    "outreach:enrich": "node scripts/outreach/find-staff-pages.mjs"
   },
   "dependencies": {
     "jspdf": "^4.2.1",
