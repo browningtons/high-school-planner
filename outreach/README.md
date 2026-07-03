@@ -17,7 +17,23 @@ npm run outreach:list -- --state UT --near 40.76,-111.89 --radius 25 --max 100
 # 2. Enrich the top schools with published counseling/CTE/CE contacts
 #    (processes 25 schools per run; re-run for the next batch)
 npm run outreach:enrich -- --contact you@yourdomain.com
+
+# 3. Generate the email sequence (Day 1 / Day 3 / Day 10 / pilot offer)
+#    for every enriched contact — review before sending anything
+npm run outreach:emails -- \
+  --base-url https://your-deployed-planner.example \
+  --from-name "Your Name" --from-title "Your Org" \
+  --reply-email hello@try.yourdomain.com \
+  --mailing-address "Street, City, ST ZIP"
 ```
+
+The email step writes `outreach/emails/campaign.csv` (one row per email,
+sorted by send date — mail-merge ready) plus a reviewable markdown file per
+contact. Demo links automatically use the matching `?school=` preset so each
+school sees its own branding. Nothing is sent automatically: review the
+copy, fix anything that reads wrong, then send from your subdomain address
+on the scheduled dates. Max 2 contacts per school by default
+(`--per-school`), suppression list honored.
 
 Both commands read/write `outreach/contacts.csv`. Re-running is safe:
 existing rows, statuses, and manually edited fields are preserved.

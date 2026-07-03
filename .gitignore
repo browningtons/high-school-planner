@@ -16,6 +16,7 @@ dist-ssr
 
 # Generated outreach data — contains contact info, never commit
 outreach/contacts*.csv
+outreach/emails/
 
 # Editor directories and files
 .vscode/*

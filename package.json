@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "onboarding:csv": "node scripts/generate-onboarding-csv.mjs",
     "outreach:list": "node scripts/outreach/build-contact-list.mjs",
-    "outreach:enrich": "node scripts/outreach/find-staff-pages.mjs"
+    "outreach:enrich": "node scripts/outreach/find-staff-pages.mjs",
+    "outreach:emails": "node scripts/outreach/generate-emails.mjs"
   },
   "dependencies": {
     "jspdf": "^4.2.1",
